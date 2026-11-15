@@ -3,6 +3,7 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream as NodeWebStream } from "node:stream/web";
 import { hasSession } from "@/lib/auth";
+import { surveyScan } from "@/lib/scan/ingest";
 import {
   discardScanTarget,
   newScanTarget,
@@ -41,7 +42,15 @@ export async function PUT(request: Request) {
     const bytes = fs.statSync(target.file).size;
     if (bytes < 1024) throw new Error("empty");
     const scan = recordScan({ id: target.id, filename, fileType, bytes });
-    return Response.json({ id: scan.id });
+    // Build the room from it straight away. A file this can't read is still
+    // kept, to be lined up by hand in the viewer.
+    let surveyed = false;
+    try {
+      surveyed = await surveyScan(scan.id);
+    } catch {
+      surveyed = false;
+    }
+    return Response.json({ id: scan.id, surveyed });
   } catch {
     discardScanTarget(target.id);
     return Response.json({ error: "The upload didn't finish. Try again." }, { status: 400 });

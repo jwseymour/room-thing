@@ -71,30 +71,31 @@ export type RoomBox = { widthMm: number; depthMm: number; heightMm: number };
 const WALL_NAMES = ["Wall A", "Wall B", "Wall C", "Wall D"];
 
 /**
- * Rewrites the room's four main walls from a scan's box. Existing walls keep
+ * Rewrites the room's main walls from the corners of its floor, in
+ * millimetres, going round clockwise as seen from above. Existing walls keep
  * their ids, names and mounting rules, so anything already planned on them
  * stays put. Walls the scan adds start with the college's no-mark rule.
  */
-export function applyBoxToRoom(doc: RoomDocument, box: RoomBox): RoomDocument {
-  const W = Math.round(box.widthMm);
-  const D = Math.round(box.depthMm);
-  const H = Math.round(box.heightMm);
-  // Going round the room clockwise as seen from above, each facing inwards.
-  const layout = [
-    { x: 0, y: 0, yawDeg: 0, width: W },
-    { x: W, y: 0, yawDeg: 90, width: D },
-    { x: W, y: D, yawDeg: 180, width: W },
-    { x: 0, y: D, yawDeg: 270, width: D },
-  ];
+export function applyPlanToRoom(
+  doc: RoomDocument,
+  corners: [number, number][],
+  heightMm: number,
+): RoomDocument {
+  const H = Math.round(heightMm);
   const existing = doc.surfaces.filter((s) => s.kind === "wall");
-  const walls: Surface[] = layout.map((slot, i) => {
+  const walls: Surface[] = corners.map((corner, i) => {
+    const next = corners[(i + 1) % corners.length];
     const old = existing[i];
     return {
       id: old?.id ?? `wall-${i + 1}`,
-      name: old?.name ?? WALL_NAMES[i],
+      name: old?.name ?? WALL_NAMES[i] ?? `Wall ${i + 1}`,
       kind: "wall",
-      polygon: rectPolygon(slot.width, H),
-      pose: { x: slot.x, y: slot.y, yawDeg: slot.yawDeg },
+      polygon: rectPolygon(Math.round(Math.hypot(next[0] - corner[0], next[1] - corner[1])), H),
+      pose: {
+        x: Math.round(corner[0]),
+        y: Math.round(corner[1]),
+        yawDeg: (Math.atan2(next[1] - corner[1], next[0] - corner[0]) * 180) / Math.PI,
+      },
       allowedMounts: old?.allowedMounts ?? ["removable_strip", "removable_hook"],
       source: "scan",
     };
@@ -106,10 +107,24 @@ export function applyBoxToRoom(doc: RoomDocument, box: RoomBox): RoomDocument {
     surfaces: [
       ...walls,
       ...doc.surfaces.filter((s) => !kept.has(s.id) && s.kind !== "wall"),
-      // Extra hand-made walls beyond the four stay, but aren't in the scan.
-      ...existing.slice(4),
+      // Extra hand-made walls beyond the scan's stay, but aren't in the scan.
+      ...existing.slice(corners.length),
     ],
   };
+}
+
+/** The same, for a room taken to be a plain rectangle. */
+export function applyBoxToRoom(doc: RoomDocument, box: RoomBox): RoomDocument {
+  const W = Math.round(box.widthMm);
+  const D = Math.round(box.depthMm);
+  return applyPlanToRoom(doc, [[0, 0], [W, 0], [W, D], [0, D]], box.heightMm);
+}
+
+/** The corners of the floor, in millimetres, from the walls that have a place. */
+export function floorCorners(doc: RoomDocument): [number, number][] {
+  return doc.surfaces
+    .filter((s) => s.kind === "wall" && s.pose)
+    .map((s) => [s.pose!.x, s.pose!.y]);
 }
 
 /** Makes one wall the pin board, and takes pins away from the others. */

@@ -21,7 +21,9 @@ export function ScanUpload({ hasScan }: { hasScan: boolean }) {
     };
     request.onload = () => {
       if (request.status === 200) {
-        router.push("/room/align");
+        // Read and measured already, unless it's a format only the viewer knows.
+        const surveyed = JSON.parse(request.responseText).surveyed;
+        router.push(surveyed ? "/room" : "/room/align");
         return;
       }
       setProgress(null);
@@ -42,7 +44,7 @@ export function ScanUpload({ hasScan }: { hasScan: boolean }) {
     setError(null);
     setProgress(1);
     const response = await fetch("/api/scan/sample", { method: "POST" });
-    if (response.ok) router.push("/room/align");
+    if (response.ok) router.push((await response.json()).surveyed ? "/room" : "/room/align");
     else {
       setProgress(null);
       setError("Couldn't make the sample room.");
@@ -72,7 +74,7 @@ export function ScanUpload({ hasScan }: { hasScan: boolean }) {
       </div>
       {busy && (
         <p role="status" className="mt-2 text-sm text-muted">
-          {progress < 1 ? `Sending, ${Math.round(progress * 100)}%` : "Nearly there"}
+          {progress < 1 ? `Sending, ${Math.round(progress * 100)}%` : "Measuring the room"}
         </p>
       )}
       {error && (

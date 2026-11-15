@@ -77,7 +77,9 @@ export class UnsupportedImageError extends Error {}
 export async function ingestImage(
   bytes: Buffer,
   filename: string,
-  source: "upload" | "shortcut",
+  source: "upload" | "shortcut" | "scan",
+  /** Things skip sorting: you already own them, so they're kept from the start. */
+  kind: "photo" | "thing" = "photo",
 ): Promise<{ id: string; duplicate: boolean }> {
   const db = getDb();
   const sha256 = createHash("sha256").update(bytes).digest("hex");
@@ -121,7 +123,9 @@ export async function ingestImage(
   db.insert(content)
     .values({
       id,
-      kind: "photo",
+      kind,
+      status: kind === "thing" ? "keep" : "inbox",
+      decidedAt: kind === "thing" ? new Date() : null,
       source,
       filename,
       sha256,
@@ -131,6 +135,60 @@ export async function ingestImage(
     })
     .run();
   return { id, duplicate: false };
+}
+
+/**
+ * Replaces the picture shown for an item with a straightened, cropped one.
+ * The original photo is kept, so it can be cut again.
+ */
+export async function replaceShownImage(id: string, bytes: Buffer): Promise<void> {
+  const meta = await sharp(bytes).metadata();
+  if (!meta.width || !meta.height) throw new UnsupportedImageError("Can't read that image.");
+  await fs.mkdir(mediaDir(id), { recursive: true });
+  await Promise.all(
+    (["thumb", "card"] as const).map((variant) =>
+      sharp(bytes)
+        .autoOrient()
+        .resize({ width: VARIANT_WIDTH[variant], withoutEnlargement: true })
+        .webp({ quality: 80 })
+        .toFile(variantPath(id, variant)),
+    ),
+  );
+  const db = getDb();
+  const row = db.select({ rev: content.imageRev }).from(content).where(eq(content.id, id)).get();
+  db.update(content)
+    .set({ widthPx: meta.width, heightPx: meta.height, imageRev: (row?.rev ?? 0) + 1 })
+    .where(eq(content.id, id))
+    .run();
+}
+
+/**
+ * Swaps in a new photo of the same thing, keeping its name, size and place
+ * on the wall. Used when a rough picture cut from the scan gets a proper one.
+ */
+export async function replacePhoto(id: string, bytes: Buffer, filename: string): Promise<void> {
+  let decodable: Buffer;
+  try {
+    decodable = await toDecodable(bytes);
+  } catch {
+    throw new UnsupportedImageError(`Can't read ${filename} as an image.`);
+  }
+  const meta = await sharp(decodable).metadata();
+  const mimeType = mimeTypeOf(meta);
+  if (!mimeType) throw new UnsupportedImageError(`Can't read ${filename} as an image.`);
+  await fs.mkdir(mediaDir(id), { recursive: true });
+  await fs.writeFile(variantPath(id, "original"), decodable);
+  await replaceShownImage(id, await sharp(decodable).autoOrient().toBuffer());
+  getDb()
+    .update(content)
+    .set({
+      filename,
+      mimeType,
+      source: "upload",
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+    })
+    .where(eq(content.id, id))
+    .run();
 }
 
 export async function removeMedia(id: string): Promise<void> {

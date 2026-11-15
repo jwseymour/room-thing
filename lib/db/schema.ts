@@ -56,19 +56,30 @@ export const content = sqliteTable(
   "content",
   {
     id: text("id").primaryKey(),
-    kind: text("kind", { enum: ["photo", "quote", "reminder"] }).notNull(),
+    /**
+     * A `thing` is something physical you already own: a poster, a postcard,
+     * a framed print. It has a real size, and is never printed.
+     */
+    kind: text("kind", { enum: ["photo", "quote", "reminder", "thing"] }).notNull(),
     status: text("status", { enum: CONTENT_STATUSES })
       .notNull()
       .default("inbox"),
     /** Text of a quote or reminder. */
     body: text("body"),
     attribution: text("attribution"),
-    source: text("source", { enum: ["upload", "shortcut"] }).notNull(),
+    source: text("source", { enum: ["upload", "shortcut", "scan"] }).notNull(),
+    /** What a thing is called. */
+    title: text("title"),
+    /** A thing's real size, once it's been measured or matched to a paper size. */
+    widthMm: integer("width_mm"),
+    heightMm: integer("height_mm"),
     filename: text("filename"),
     sha256: text("sha256").unique(),
     mimeType: text("mime_type"),
     widthPx: integer("width_px"),
     heightPx: integer("height_px"),
+    /** Goes up each time the picture is re-cut, so browsers fetch the new one. */
+    imageRev: integer("image_rev").notNull().default(0),
     createdAt: createdAt(),
     decidedAt: integer("decided_at", { mode: "timestamp_ms" }),
   },
@@ -103,6 +114,8 @@ export type ScanAlignment = {
   up: "y+" | "y-" | "z+" | "z-";
   /** Multiplier from a tape-measured distance. 1 until one is entered. */
   tapeScale: number;
+  /** False when the scan never caught the ceiling, so the height is a floor on it. */
+  ceilingSeen?: boolean;
 };
 
 /**
@@ -145,6 +158,9 @@ export const wallPlacements = sqliteTable(
       .references(() => content.id, { onDelete: "cascade" }),
     printSizeId: text("print_size_id").notNull(),
     orientation: text("orientation").$type<Orientation>().notNull(),
+    /** Set for things, which have their own size rather than a print size. */
+    widthMm: integer("width_mm"),
+    heightMm: integer("height_mm"),
     u: integer("u").notNull(),
     v: integer("v").notNull(),
     mount: text("mount").$type<Mount>().notNull(),

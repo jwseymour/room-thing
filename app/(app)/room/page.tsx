@@ -1,30 +1,42 @@
+import fs from "node:fs";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { RoomScreen, type RoomItem } from "@/components/scan/RoomScreen";
+import { RoomScreen, type RoomItem } from "@/components/room/RoomScreen";
 import { requireSession } from "@/lib/auth";
-import { listContent } from "@/lib/content/store";
+import { listContent, listThings, type ContentItem } from "@/lib/content/store";
 import { activePlacements, getRoom } from "@/lib/room/store";
-import { currentScan } from "@/lib/scan/store";
+import { surveyScan } from "@/lib/scan/ingest";
+import { currentScan, wallImagePath } from "@/lib/scan/store";
 
-// Waits for live data instead of showing a placeholder. See app/(app)/page.tsx.
+// Waits for live data instead of showing a placeholder. See lib/auth.ts.
 export const instant = false;
 
-const toItem = ({ id, kind, body, attribution, widthPx, heightPx }: RoomItem): RoomItem => ({
-  id, kind, body, attribution, widthPx, heightPx,
+const toItem = (c: ContentItem): RoomItem => ({
+  id: c.id,
+  kind: c.kind,
+  title: c.title,
+  body: c.body,
+  attribution: c.attribution,
+  widthPx: c.widthPx,
+  heightPx: c.heightPx,
+  widthMm: c.widthMm,
+  heightMm: c.heightMm,
+  imageRev: c.imageRev,
 });
 
-export default async function RoomPage() {
+export default async function RoomPage({ searchParams }: PageProps<"/room">) {
   await requireSession();
+  const query = await searchParams;
+  const one = (value: string | string[] | undefined) => (typeof value === "string" ? value : null);
 
-  const scan = currentScan();
+  let scan = currentScan();
   if (!scan) {
     return (
-      <div className="py-12 text-center">
-        <h1 className="text-3xl">Your room, in 3D</h1>
-        <p className="mx-auto mt-2 max-w-md text-muted">
-          Scan the room with your phone and plan everything inside it: walk
-          around, see it from your bed or your desk, and put pictures on the
-          walls at their real size.
+      <div className="py-16 text-center">
+        <h1 className="text-2xl">Your room, as geometry</h1>
+        <p className="mx-auto mt-3 max-w-md text-muted">
+          Scan the room with your phone. The app measures the walls, finds the
+          furniture, and works out how much clear wall you have to play with.
         </p>
         <Link href="/room/scan" className="btn btn-primary mt-6">
           Scan your room
@@ -32,31 +44,50 @@ export default async function RoomPage() {
       </div>
     );
   }
-  if (!scan.alignment) redirect("/room/align");
+  if (!scan.alignment) {
+    // A scan that hasn't been read yet: build the room from it now. Files
+    // this can't read are lined up by hand instead.
+    if (!(await surveyScan(scan.id))) redirect("/room/align");
+    scan = currentScan()!;
+  }
 
   const { doc } = getRoom();
-  const placements = activePlacements().map(
-    ({ id, surfaceId, printSizeId, orientation, u, v, mount, content }) => ({
-      id, surfaceId, printSizeId, orientation, u, v, mount, content: toItem(content),
-    }),
-  );
+  const placements = activePlacements().map((p) => ({
+    id: p.id,
+    surfaceId: p.surfaceId,
+    printSizeId: p.printSizeId,
+    orientation: p.orientation,
+    widthMm: p.widthMm,
+    heightMm: p.heightMm,
+    u: p.u,
+    v: p.v,
+    mount: p.mount,
+    up: p.state === "up",
+    content: toItem(p.content),
+  }));
+  const wallImages = doc.surfaces
+    .filter((s) => fs.existsSync(wallImagePath(scan.id, s.id)))
+    .map((s) => s.id);
+  const wall = one(query.wall);
 
   return (
-    <>
-      <h1 className="mb-2 text-3xl">{doc.name}</h1>
-      <RoomScreen
-        key={`${scan.id}-${scan.alignment.matrix.join()}`}
-        scan={{
-          id: scan.id,
-          fileType: scan.fileType,
-          sample: scan.sample,
-          tapeChecked: scan.tapeCheckedAt !== null,
-        }}
-        matrix={scan.alignment.matrix}
-        doc={doc}
-        initialPlacements={placements}
-        tray={listContent("keep").map(toItem)}
-      />
-    </>
+    <RoomScreen
+      key={`${scan.id}-${scan.alignment!.matrix.join()}`}
+      scan={{
+        id: scan.id,
+        fileType: scan.fileType,
+        matrix: scan.alignment!.matrix,
+        ceilingSeen: scan.alignment!.ceilingSeen ?? true,
+        tapeChecked: scan.tapeCheckedAt !== null,
+      }}
+      doc={doc}
+      initialPlacements={placements}
+      tray={[...listThings(), ...listContent("keep")].map(toItem)}
+      wallImages={wallImages}
+      start={{
+        wall: wall && doc.surfaces.some((s) => s.id === wall) ? wall : null,
+        place: one(query.place),
+      }}
+    />
   );
 }

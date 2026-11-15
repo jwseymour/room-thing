@@ -7,7 +7,7 @@ import {
   printQuality,
 } from "@/lib/room/print";
 import { MOUNT_LABELS } from "@/lib/room/schema";
-import { activePlacements, getRoom } from "@/lib/room/store";
+import { getRoom, printPlacements } from "@/lib/room/store";
 import { validatePlacement, type PlacedRect } from "@/lib/room/validate";
 
 // Waits for live data instead of showing a placeholder. See app/(app)/page.tsx.
@@ -17,7 +17,7 @@ export default async function PrintPage() {
   await requireSession();
 
   const { doc } = getRoom();
-  const placements = activePlacements();
+  const placements = printPlacements();
 
   const placed = new Map<string, PlacedRect[]>();
   for (const p of placements) {
@@ -63,10 +63,11 @@ export default async function PrintPage() {
       <div className="py-16 text-center">
         <h1 className="text-3xl">Nothing to print yet</h1>
         <p className="mt-2 text-muted">
-          Put something on a wall and it&apos;ll show up here.
+          Photos and quotes you put on a wall show up here to be printed.
+          Things you already own don&apos;t need printing.
         </p>
-        <Link href="/walls" className="btn btn-primary mt-6">
-          Go to walls
+        <Link href="/room" className="btn btn-primary mt-6">
+          Go to the room
         </Link>
       </div>
     );

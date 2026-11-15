@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, ne } from "drizzle-orm";
 import { getDb } from "../db";
 import {
   content,
@@ -22,19 +22,37 @@ export function inboxBatch(limit: number): ContentItem[] {
   return getDb()
     .select()
     .from(content)
-    .where(eq(content.status, "inbox"))
+    .where(and(eq(content.status, "inbox"), ne(content.kind, "thing")))
     .orderBy(asc(content.createdAt))
     .limit(limit)
     .all();
 }
 
+/** Photos, quotes and reminders: what the library and the sorting deck hold. */
 export function listContent(status?: ContentStatus): ContentItem[] {
   return getDb()
     .select()
     .from(content)
-    .where(status ? eq(content.status, status) : undefined)
+    .where(and(ne(content.kind, "thing"), status ? eq(content.status, status) : undefined))
     .orderBy(desc(content.createdAt))
     .all();
+}
+
+/** Physical things you own, newest first. */
+export function listThings(): ContentItem[] {
+  return getDb()
+    .select()
+    .from(content)
+    .where(eq(content.kind, "thing"))
+    .orderBy(desc(content.createdAt))
+    .all();
+}
+
+export function updateThing(
+  id: string,
+  patch: Partial<{ title: string | null; widthMm: number | null; heightMm: number | null }>,
+): void {
+  getDb().update(content).set(patch).where(eq(content.id, id)).run();
 }
 
 export function getContent(id: string): ContentItem | undefined {
@@ -45,6 +63,7 @@ export function statusCounts(): Record<ContentStatus, number> {
   const rows = getDb()
     .select({ status: content.status, n: count() })
     .from(content)
+    .where(ne(content.kind, "thing"))
     .groupBy(content.status)
     .all();
   const counts = { inbox: 0, keep: 0, maybe: 0, no: 0 };

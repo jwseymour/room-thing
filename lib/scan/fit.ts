@@ -22,6 +22,18 @@ export type RoomFit = {
    * is a guess and should be checked by eye.
    */
   confidence: { floor: number; ceiling: number; walls: number };
+  /**
+   * The four corners of the floor in the room frame, in metres, as [x, z].
+   * They run clockwise seen from above, starting at the origin, so wall `i`
+   * goes from corner `i` to corner `i + 1`. Old rooms are rarely square, so
+   * each wall is fitted on its own and the corners are where they meet.
+   */
+  plan: [number, number][];
+  /**
+   * False when the scan never caught the ceiling, which is common: it's blank
+   * and above eye level. The height is then the top of whatever was scanned.
+   */
+  ceilingSeen: boolean;
 };
 
 const BIN_M = 0.02;
@@ -109,7 +121,117 @@ function outerPeak(
   };
 }
 
-function fitWithUp(points: Float32Array, up: UpAxis) {
+/**
+ * Scans often carry a shell of far-away splats standing in for the sky or the
+ * view through a window. Keeps only the dense middle, where the room is.
+ */
+export function coreBounds(points: Float32Array): { min: number[]; max: number[] } {
+  const total = Math.floor(points.length / 3);
+  const step = Math.max(1, Math.floor(total / 60_000));
+  const n = Math.floor(total / step);
+  const min = [0, 0, 0];
+  const max = [0, 0, 0];
+  for (let axis = 0; axis < 3; axis++) {
+    const values = new Float32Array(n);
+    for (let i = 0; i < n; i++) values[i] = points[i * step * 3 + axis];
+    values.sort();
+    const lo = percentile(values, 0.1);
+    const hi = percentile(values, 0.9);
+    const pad = Math.max(hi - lo, 0.5) * 0.6;
+    min[axis] = lo - pad;
+    max[axis] = hi + pad;
+  }
+  return { min, max };
+}
+
+function cropToCore(points: Float32Array): Float32Array {
+  const { min, max } = coreBounds(points);
+  const out = new Float32Array(points.length);
+  let k = 0;
+  for (let i = 0; i + 2 < points.length; i += 3) {
+    const x = points[i], y = points[i + 1], z = points[i + 2];
+    if (x < min[0] || x > max[0] || y < min[1] || y > max[1] || z < min[2] || z > max[2]) continue;
+    out[k++] = x;
+    out[k++] = y;
+    out[k++] = z;
+  }
+  return out.subarray(0, k);
+}
+
+/**
+ * The outermost level that still holds a fair share of points: where the scan
+ * stops, whether or not there's a clean surface there.
+ */
+function outerEdge(h: Histogram, from: number, to: number): number {
+  const a = Math.max(0, Math.floor((from - h.start) / BIN_M));
+  const b = Math.min(h.counts.length - 1, Math.ceil((to - h.start) / BIN_M));
+  const inRange = Array.from(h.counts.subarray(a, b + 1)).filter((c) => c > 0).sort((x, y) => x - y);
+  const typical = inRange.length ? inRange[Math.floor(inRange.length / 2)] : 0;
+  const threshold = typical * 0.25;
+  for (let i = b; i >= a + 1; i--) {
+    if (h.counts[i] >= threshold && h.counts[i - 1] >= threshold) {
+      return h.start + (i + 1) * BIN_M;
+    }
+  }
+  return h.start + (b + 0.5) * BIN_M;
+}
+
+type Line = { n: [number, number]; k: number };
+
+function meet(a: Line, b: Line): [number, number] {
+  const det = a.n[0] * b.n[1] - a.n[1] * b.n[0];
+  return [(a.k * b.n[1] - a.n[1] * b.k) / det, (a.n[0] * b.k - a.k * b.n[0]) / det];
+}
+
+/**
+ * Fits one wall on its own. `across` is each nearby point's distance across
+ * the wall and `along` its position along it. Tries small turns either way
+ * and keeps the one where the points pile into the thinnest line.
+ */
+function refineWall(
+  across: number[],
+  along: number[],
+  at: number,
+): { delta: number; at: number } {
+  if (across.length < 200) return { delta: 0, at };
+  let mid = 0;
+  for (const v of along) mid += v;
+  mid /= along.length;
+  const BIN = 0.01;
+  const SPAN = 0.2;
+  const bins = Math.ceil((SPAN * 2) / BIN);
+  const score = (deltaDeg: number) => {
+    const t = (deltaDeg * Math.PI) / 180;
+    const cos = Math.cos(t), sin = Math.sin(t);
+    const counts = new Float32Array(bins);
+    for (let i = 0; i < across.length; i++) {
+      const v = (across[i] - at) * cos - (along[i] - mid) * sin;
+      const b = Math.floor((v + SPAN) / BIN);
+      if (b >= 0 && b < bins) counts[b]++;
+    }
+    let best = 0, index = 0;
+    for (let i = 1; i < bins - 1; i++) {
+      const c = counts[i - 1] + counts[i] * 2 + counts[i + 1];
+      if (c > best) { best = c; index = i; }
+    }
+    return { best, offset: -SPAN + (index + 0.5) * BIN };
+  };
+  const straight = score(0);
+  let pick = { delta: 0, ...straight };
+  for (let d = -3; d <= 3.001; d += 0.25) {
+    const s = score(d);
+    if (s.best > pick.best) pick = { delta: d, ...s };
+  }
+  // A square corner is the likelier truth, so a turn has to earn its place.
+  if (pick.best < straight.best * 1.2) pick = { delta: 0, ...straight };
+  // Stay near the wall the first pass chose: a wardrobe face a hand's width
+  // in front of it can be sharper than the wall itself.
+  if (Math.abs(pick.offset) > 0.06) return { delta: pick.delta, at };
+  return { delta: pick.delta, at: at + pick.offset };
+}
+
+function fitWithUp(all: Float32Array, up: UpAxis) {
+  const points = cropToCore(all);
   const stride = Math.max(1, Math.floor(points.length / 3 / MAX_POINTS));
   const n = Math.floor(points.length / 3 / stride);
   const toUp = uprighter(up);
@@ -131,7 +253,25 @@ function fitWithUp(points: Float32Array, up: UpAxis) {
   const ySpan = Math.max(yHi - yLo, 0.5);
   const yHist = histogram(ys, yLo - 0.2, yHi + 0.2);
   const floor = outerPeak(yHist, yLo - 0.2, yLo + ySpan * 0.5, "low");
-  const ceiling = outerPeak(yHist, yHi - ySpan * 0.5, yHi + 0.2, "high");
+  const ceilingPeak = outerPeak(yHist, yHi - ySpan * 0.5, yHi + 0.2, "high");
+  // A blank ceiling often isn't in the scan at all. If the scan carries on
+  // well above the highest flat level, that level was a shelf, not the ceiling.
+  const top = outerEdge(yHist, yHi - ySpan * 0.5, yHi + 0.2);
+  // A ceiling is a whole floor's worth of points at one height, far more
+  // than the walls put at any height. Without that, the top of the scan is
+  // just where the walls stop.
+  const upper = Array.from(
+    yHist.counts.subarray(
+      Math.max(0, Math.floor((yHi - ySpan * 0.5 - yHist.start) / BIN_M)),
+      Math.floor((top - yHist.start) / BIN_M),
+    ),
+  ).filter((c) => c > 0).sort((a, b) => a - b);
+  const usual = upper.length ? upper[upper.length >> 1] : 0;
+  const peakBin = Math.floor((ceilingPeak.at - yHist.start) / BIN_M);
+  let peakCount = 0;
+  for (let i = peakBin - 1; i <= peakBin + 1; i++) peakCount = Math.max(peakCount, yHist.counts[i] ?? 0);
+  const ceilingSeen = top - ceilingPeak.at < 0.12 && peakCount > usual * 2.5;
+  const ceiling = ceilingSeen ? ceilingPeak : { at: top, strength: 0 };
   const height = ceiling.at - floor.at;
 
   // Walls are clearest above the furniture and below the ceiling.
@@ -203,14 +343,70 @@ function fitWithUp(points: Float32Array, up: UpAxis) {
   const wx = band.length ? wallPair(rx) : { min: { at: 0, strength: 0 }, max: { at: 1, strength: 0 } };
   const wz = band.length ? wallPair(rz) : { min: { at: 0, strength: 0 }, max: { at: 1, strength: 0 } };
 
-  // matrix = translate(-min) · rotateY(yaw) · upright
+  // Now each wall on its own, since the four are rarely at perfect right
+  // angles. Lines are `n · p = k` in the turned frame, n pointing along +z or +x.
+  const near = (values: Float32Array, other: Float32Array, at: number) => {
+    const across: number[] = [];
+    const along: number[] = [];
+    for (let k = 0; k < values.length; k++) {
+      if (Math.abs(values[k] - at) < 0.2) {
+        across.push(values[k]);
+        along.push(other[k]);
+      }
+    }
+    return refineWall(across, along, at);
+  };
+  const lineZ = (at: number): Line => {
+    const r = near(rz, rx, at);
+    const t = (r.delta * Math.PI) / 180;
+    let mid = 0, count = 0;
+    for (let k = 0; k < rz.length; k++) if (Math.abs(rz[k] - at) < 0.2) { mid += rx[k]; count++; }
+    mid = count ? mid / count : 0;
+    // (z - at') cos - (x - mid) sin = 0
+    return { n: [-Math.sin(t), Math.cos(t)], k: r.at * Math.cos(t) - mid * Math.sin(t) };
+  };
+  const lineX = (at: number): Line => {
+    const r = near(rx, rz, at);
+    const t = (r.delta * Math.PI) / 180;
+    let mid = 0, count = 0;
+    for (let k = 0; k < rx.length; k++) if (Math.abs(rx[k] - at) < 0.2) { mid += rz[k]; count++; }
+    mid = count ? mid / count : 0;
+    return { n: [Math.cos(t), -Math.sin(t)], k: r.at * Math.cos(t) - mid * Math.sin(t) };
+  };
+  const wallA = lineZ(wz.min.at);
+  const wallB = lineX(wx.max.at);
+  const wallC = lineZ(wz.max.at);
+  const wallD = lineX(wx.min.at);
+  const corners = [meet(wallD, wallA), meet(wallA, wallB), meet(wallB, wallC), meet(wallC, wallD)];
+
+  // The room frame has its origin at the first corner and X along wall A.
+  const ax = corners[1][0] - corners[0][0];
+  const az = corners[1][1] - corners[0][1];
+  const extra = Math.atan2(az, ax);
+  const total = theta + extra;
+  const tc = Math.cos(total);
+  const ts = Math.sin(total);
+  const ec = Math.cos(extra);
+  const es = Math.sin(extra);
+  const toRoom = ([x, z]: [number, number]): [number, number] => {
+    const dx = x - corners[0][0];
+    const dz = z - corners[0][1];
+    return [dx * ec + dz * es, -dx * es + dz * ec];
+  };
+  const plan = corners.map(toRoom);
+  const origin = [
+    corners[0][0] * ec + corners[0][1] * es,
+    -corners[0][0] * es + corners[0][1] * ec,
+  ];
+
+  // matrix = translate(-origin) · rotateY(yaw + extra) · upright
   const R = UP_ROWS[up];
   const rows = [
-    [0, 1, 2].map((c) => cos * R[0][c] + sin * R[2][c]),
+    [0, 1, 2].map((c) => tc * R[0][c] + ts * R[2][c]),
     [0, 1, 2].map((c) => R[1][c]),
-    [0, 1, 2].map((c) => -sin * R[0][c] + cos * R[2][c]),
+    [0, 1, 2].map((c) => -ts * R[0][c] + tc * R[2][c]),
   ];
-  const t = [-wx.min.at, -floor.at, -wz.min.at];
+  const t = [-origin[0], -floor.at, -origin[1]];
   const matrix = [
     rows[0][0], rows[1][0], rows[2][0], 0,
     rows[0][1], rows[1][1], rows[2][1], 0,
@@ -221,8 +417,10 @@ function fitWithUp(points: Float32Array, up: UpAxis) {
   const fit: RoomFit = {
     matrix,
     up,
-    widthM: wx.max.at - wx.min.at,
-    depthM: wz.max.at - wz.min.at,
+    plan,
+    ceilingSeen,
+    widthM: Math.max(plan[1][0], plan[2][0]) - Math.min(plan[0][0], plan[3][0]),
+    depthM: Math.max(plan[2][1], plan[3][1]) - Math.min(plan[0][1], plan[1][1]),
     heightM: height,
     confidence: {
       floor: floor.strength,

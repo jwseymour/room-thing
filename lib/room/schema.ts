@@ -80,6 +80,29 @@ export const furnitureSchema = z.object({
 });
 export type Furniture = z.infer<typeof furnitureSchema>;
 
+/**
+ * A piece of furniture as a plain box standing on the floor plan. `x` and `y`
+ * are its corner nearest the room's origin, `w` runs along x and `d` along y.
+ */
+export const BLOCK_KINDS = ["bed", "desk", "tall", "low", "unit", "chair"] as const;
+export const blockSchema = z.object({
+  id: z.string().min(1),
+  label: z.string(),
+  kind: z.enum(BLOCK_KINDS),
+  x: mm,
+  y: mm,
+  w: positiveMm,
+  d: positiveMm,
+  bottom: mm.nonnegative(),
+  top: positiveMm,
+  /** Its colour in the scan, as #rrggbb. */
+  color: z.string().regex(/^#[0-9a-f]{6}$/),
+  /** True when you can see the floor under it, as with a desk. */
+  open: z.boolean(),
+  source: sourceSchema,
+});
+export type Block = z.infer<typeof blockSchema>;
+
 export const viewpointSchema = z.object({
   id: z.string().min(1),
   label: z.string().min(1),
@@ -119,6 +142,8 @@ export const roomDocumentSchema = z.object({
   surfaces: z.array(surfaceSchema),
   fixtures: z.array(fixtureSchema),
   furniture: z.array(furnitureSchema),
+  /** Furniture found in the scan, or drawn by hand, for the 3D room. */
+  blocks: z.array(blockSchema).default([]),
   viewpoints: z.array(viewpointSchema),
   measurements: z.array(measurementSchema),
 });
@@ -175,6 +200,7 @@ export function defaultRoom(): RoomDocument {
     ],
     fixtures: [],
     furniture: [],
+    blocks: [],
     viewpoints: [],
     measurements: [],
   };

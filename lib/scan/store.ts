@@ -4,8 +4,8 @@ import path from "node:path";
 import { desc, eq } from "drizzle-orm";
 import { DATA_DIR } from "../config";
 import { getDb } from "../db";
-import { scans, type ScanAlignment } from "../db/schema";
-import { getRoom, saveRoom } from "../room/store";
+import { scans, wallPlacements, type ScanAlignment } from "../db/schema";
+import { activePlacements, getRoom, saveRoom } from "../room/store";
 import { applyBoxToRoom, type RoomBox } from "./frame";
 
 export type Scan = typeof scans.$inferSelect;
@@ -95,6 +95,64 @@ export function saveAlignment(
     })
     .where(eq(scans.id, scanId))
     .run();
+}
+
+/**
+ * Corrects the whole room's scale from one wall measured with a tape. A scan
+ * gets shapes right but can be a percent or two out in size, and that error
+ * is the same everywhere, so one honest measurement fixes all of it.
+ */
+export function applyTapeMeasure(surfaceId: string, realWidthMm: number): number {
+  const { doc } = getRoom();
+  const surface = doc.surfaces.find((s) => s.id === surfaceId);
+  const scan = currentScan();
+  if (!surface || !surface.pose) throw new Error(`Unknown wall: ${surfaceId}`);
+  const scanned = Math.max(...surface.polygon.map((p) => p.u));
+  const k = realWidthMm / scanned;
+  if (!(k > 0.8 && k < 1.25)) {
+    throw new Error("That's too far from the scan to be a correction.");
+  }
+  const scaled = new Set(doc.surfaces.filter((s) => s.pose).map((s) => s.id));
+  const r = (value: number) => Math.round(value * k);
+  saveRoom({
+    ...doc,
+    ceilingMm: r(doc.ceilingMm),
+    surfaces: doc.surfaces.map((s) =>
+      s.pose
+        ? {
+            ...s,
+            polygon: s.polygon.map((p) => ({ u: r(p.u), v: r(p.v) })),
+            pose: { ...s.pose, x: r(s.pose.x), y: r(s.pose.y) },
+            source: "tape" as const,
+          }
+        : s,
+    ),
+    fixtures: doc.fixtures.map((f) =>
+      scaled.has(f.surfaceId)
+        ? { ...f, rect: { u: r(f.rect.u), v: r(f.rect.v), w: r(f.rect.w), h: r(f.rect.h) } }
+        : f,
+    ),
+    blocks: doc.blocks.map((b) => ({
+      ...b, x: r(b.x), y: r(b.y), w: r(b.w), d: r(b.d), bottom: r(b.bottom), top: r(b.top),
+    })),
+  });
+  const db = getDb();
+  // Things keep their own size; only where they sit on the wall moves.
+  for (const p of activePlacements()) {
+    if (!scaled.has(p.surfaceId)) continue;
+    db.update(wallPlacements).set({ u: r(p.u), v: r(p.v) }).where(eq(wallPlacements.id, p.id)).run();
+  }
+  if (scan?.alignment) {
+    const matrix = scan.alignment.matrix.map((value, i) => (i % 4 === 3 ? value : value * k));
+    db.update(scans)
+      .set({
+        alignment: { ...scan.alignment, matrix, tapeScale: scan.alignment.tapeScale * k },
+        tapeCheckedAt: new Date(),
+      })
+      .where(eq(scans.id, scan.id))
+      .run();
+  }
+  return k;
 }
 
 export function deleteScan(id: string): void {

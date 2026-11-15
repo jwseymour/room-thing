@@ -4,6 +4,7 @@ import { requireSession } from "@/lib/auth";
 import { surfaceBounds } from "@/lib/room/geometry";
 import { hangingSteps, supplies } from "@/lib/room/hanging";
 import { PRINT_SIZES } from "@/lib/room/print";
+import { obstacleFixtures } from "@/lib/room/space";
 import { MOUNT_LABELS } from "@/lib/room/schema";
 import { activePlacements, getRoom } from "@/lib/room/store";
 import { currentScan } from "@/lib/scan/store";
@@ -27,8 +28,8 @@ export default async function HangPage() {
         <p className="mt-2 text-muted">
           Put something on a wall and its position will show up here.
         </p>
-        <Link href="/walls" className="btn btn-primary mt-6">
-          Go to walls
+        <Link href="/room" className="btn btn-primary mt-6">
+          Go to the room
         </Link>
       </div>
     );
@@ -48,7 +49,7 @@ export default async function HangPage() {
       <h1 className="text-3xl">Hanging guide</h1>
       <p className="mt-1 mb-4 text-muted">
         {up} of {placements.length} up. Work left to right: mark the top edge
-        in pencil, check it with a level, then fix the print.
+        in pencil, check it with a level, then fix it in place.
       </p>
 
       {needed.length > 0 && (
@@ -103,9 +104,10 @@ export default async function HangPage() {
                 <p className="mb-2 rounded-lg border border-line p-3 text-sm text-muted">
                   These positions come from the scan, which is usually right
                   to within two or three centimetres.{" "}
-                  <Link href="/room/align" className="underline">
-                    Check one distance with a tape
+                  <Link href={`/room?wall=${surface.id}`} className="underline">
+                    Measure this wall with a tape
                   </Link>{" "}
+                  (face it, then Edit)
                   to tighten that up.
                 </p>
               )}
@@ -116,9 +118,7 @@ export default async function HangPage() {
                 aria-label={`${surface.name} with each item numbered`}
                 className="mb-2 block max-h-[45dvh] w-full rounded-lg border border-line bg-card"
               >
-                {doc.fixtures
-                  .filter((f) => f.surfaceId === surface.id)
-                  .map((f) => (
+                {obstacleFixtures(doc, surface).map((f) => (
                     <rect
                       key={f.id}
                       x={f.rect.u}
@@ -167,9 +167,9 @@ export default async function HangPage() {
                         {step.number}
                       </span>
                       <div className="size-14 shrink-0 overflow-hidden rounded bg-paper">
-                        {item.content.kind === "photo" ? (
+                        {item.content.kind === "photo" || item.content.kind === "thing" ? (
                           <img
-                            src={`/api/media/${item.content.id}/thumb`}
+                            src={`/api/media/${item.content.id}/thumb?v=${item.content.imageRev}`}
                             alt=""
                             className="size-full object-cover"
                           />
@@ -187,9 +187,11 @@ export default async function HangPage() {
                           Top edge: {mm(step.topFromFloorMm)} from floor
                         </p>
                         <p className="text-muted">
-                          {PRINT_SIZES.find((s) => s.id === item.printSizeId)?.label},{" "}
-                          {item.orientation} · {MOUNT_LABELS[item.mount]}
-                          {item.state === "planned" && " · not ordered yet"}
+                          {item.content.kind === "thing"
+                            ? `${item.content.title ?? "Thing"}, ${Math.round(step.w / 10)} × ${Math.round(step.h / 10)} cm`
+                            : `${PRINT_SIZES.find((s) => s.id === item.printSizeId)?.label}, ${item.orientation}`}{" "}
+                          · {MOUNT_LABELS[item.mount]}
+                          {item.state === "planned" && item.content.kind !== "thing" && " · not ordered yet"}
                         </p>
                       </div>
                       <UpToggle id={item.id} up={item.state === "up"} />

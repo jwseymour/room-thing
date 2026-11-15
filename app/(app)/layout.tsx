@@ -9,7 +9,7 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
   return (
     <div className="min-h-dvh pb-24 sm:pb-8">
       <AppNav />
-      <main className="mx-auto max-w-5xl px-4 pt-6">{children}</main>
+      <main className="mx-auto max-w-6xl px-4 pt-5">{children}</main>
     </div>
   );
 }

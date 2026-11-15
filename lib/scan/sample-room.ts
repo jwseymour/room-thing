@@ -38,13 +38,15 @@ export function sampleRoomSplats(density = 1): Splat[] {
   /** A flat rectangle from `origin`, spanned by edges `a` and `b`. */
   const panel = (
     origin: Colour, a: Colour, b: Colour,
-    colour: (s: number, t: number) => Colour,
+    colour: (s: number, t: number) => Colour | null,
   ) => {
     const la = Math.hypot(...a);
     const lb = Math.hypot(...b);
     for (let s = step / 2; s < la; s += step) {
       for (let t = step / 2; t < lb; t += step) {
-        const [r, g, bl] = colour(s, t);
+        const tone = colour(s, t);
+        if (!tone) continue;
+        const [r, g, bl] = tone;
         const shade = 0.94 + rand() * 0.06;
         out.push({
           x: origin[0] + (a[0] * s) / la + (b[0] * t) / lb + jitter(),
@@ -70,9 +72,15 @@ export function sampleRoomSplats(density = 1): Splat[] {
   const inRect = (s: number, t: number, s0: number, t0: number, w: number, h: number) =>
     s > s0 && s < s0 + w && t > t0 && t < t0 + h;
 
-  // Floor and ceiling.
-  panel([0, 0, 0], [W, 0, 0], [0, 0, D], (s) =>
-    Math.floor(s / 0.14) % 2 === 0 ? [0.55, 0.4, 0.27] : [0.5, 0.36, 0.24]);
+  // Floor and ceiling. A scanner can't see the floor under a bed or a
+  // wardrobe, so there's none there.
+  const BED = { x: 0.05, z: 0.1, w: 0.95, d: 2.0 };
+  const WARDROBE = { x: 0.05, z: D - 1.25, w: 0.6, d: 1.0 };
+  // Nor the sliver between them and the wall they stand against.
+  const under = (x: number, z: number) =>
+    [BED, WARDROBE].some((f) => x < f.x + f.w && z > f.z && z < f.z + f.d);
+  panel([0, 0, 0], [W, 0, 0], [0, 0, D], (s, t) =>
+    under(s, t) ? null : Math.floor(s / 0.14) % 2 === 0 ? [0.55, 0.4, 0.27] : [0.5, 0.36, 0.24]);
   panel([0, H, 0], [W, 0, 0], [0, 0, D], () => [0.95, 0.95, 0.93]);
   // Wall at z = 0: the pin board wall.
   panel([0, 0, 0], [W, 0, 0], [0, H, 0], (s, t) =>
@@ -89,8 +97,8 @@ export function sampleRoomSplats(density = 1): Splat[] {
 
   // Furniture: a desk under the window, a bed, and a wardrobe.
   box(W - 0.65, 0.7, 1.35, 0.65, 0.04, 1.4, [0.7, 0.58, 0.42]);
-  box(0.05, 0, 0.1, 0.95, 0.5, 2.0, [0.32, 0.42, 0.6]);
-  box(0.05, 0, D - 1.25, 0.6, 1.95, 1.0, [0.6, 0.5, 0.4]);
+  box(BED.x, 0, BED.z, BED.w, 0.5, BED.d, [0.32, 0.42, 0.6]);
+  box(WARDROBE.x, 0, WARDROBE.z, WARDROBE.w, 1.95, WARDROBE.d, [0.6, 0.5, 0.4]);
 
   // Into the file's frame: turn, shift, then flip so Y points down.
   const theta = (yawDeg * Math.PI) / 180;

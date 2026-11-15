@@ -1,7 +1,7 @@
 import { zipSync } from "fflate";
 import { hasSession } from "@/lib/auth";
 import { printFileNames, renderPrintFile } from "@/lib/room/print-files";
-import { activePlacements } from "@/lib/room/store";
+import { printPlacements } from "@/lib/room/store";
 
 /**
  * Print-ready files in a zip, in a folder per size. By default that's only the
@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   }
 
   const all = new URL(request.url).searchParams.has("all");
-  const items = activePlacements().filter((p) => all || p.state === "planned");
+  const items = printPlacements().filter((p) => all || p.state === "planned");
   if (items.length === 0) {
     return Response.json({ error: "Nothing to print" }, { status: 404 });
   }

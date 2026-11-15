@@ -1,10 +1,12 @@
-import { printDimensions, printSize, type Orientation } from "./print";
+import { placementSize, type Orientation } from "./print";
 import { MOUNT_LABELS, type Mount } from "./schema";
 
 export type HangItem = {
   id: string;
   printSizeId: string;
   orientation: Orientation;
+  widthMm?: number | null;
+  heightMm?: number | null;
   u: number;
   v: number;
   mount: Mount;
@@ -33,7 +35,7 @@ const COLUMN_TOLERANCE_MM = 20;
 export function hangingSteps<T extends HangItem>(items: T[]): HangStep<T>[] {
   const sized = items.map((item) => ({
     item,
-    ...printDimensions(item.printSizeId, item.orientation),
+    ...placementSize(item),
   }));
   sized.sort((a, b) =>
     Math.abs(a.item.u - b.item.u) > COLUMN_TOLERANCE_MM
@@ -61,7 +63,7 @@ export function supplies(items: HangItem[]): Supply[] {
   const count = (mount: Mount) => items.filter((i) => i.mount === mount);
   const fixings = (list: HangItem[]) =>
     list.reduce(
-      (sum, i) => sum + (printSize(i.printSizeId).longMm > 420 ? 6 : 4),
+      (sum, i) => sum + (Math.max(placementSize(i).w, placementSize(i).h) > 420 ? 6 : 4),
       0,
     );
   const list: Supply[] = [];

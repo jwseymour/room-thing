@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireSession } from "../auth";
-import { PRINT_SIZES } from "../room/print";
+import { OWN_SIZE, PRINT_SIZES } from "../room/print";
 import { mountSchema, type Mount } from "../room/schema";
 import {
   addPlacement,
@@ -15,7 +15,8 @@ import {
   updatePlacement,
 } from "../room/store";
 
-const printSizeId = z.enum(PRINT_SIZES.map((s) => s.id));
+const printSizeId = z.enum([...PRINT_SIZES.map((s) => s.id), OWN_SIZE]);
+const sizeMm = z.number().int().min(10).max(5000).nullable().optional();
 const orientation = z.enum(["landscape", "portrait"]);
 const position = z.number().int().min(0);
 
@@ -31,9 +32,12 @@ const newPlacement = z.object({
   contentId: z.uuid(),
   printSizeId,
   orientation,
+  widthMm: sizeMm,
+  heightMm: sizeMm,
   u: position,
   v: position,
   mount: mountSchema,
+  state: z.enum(["planned", "up"]).optional(),
 });
 
 export async function addPlacementAction(input: {
@@ -41,9 +45,12 @@ export async function addPlacementAction(input: {
   contentId: string;
   printSizeId: string;
   orientation: "landscape" | "portrait";
+  widthMm?: number | null;
+  heightMm?: number | null;
   u: number;
   v: number;
   mount: Mount;
+  state?: "planned" | "up";
 }): Promise<string> {
   await requireSession();
   const id = addPlacement(newPlacement.parse(input));
@@ -51,9 +58,21 @@ export async function addPlacementAction(input: {
   return id;
 }
 
+/** Puts several things up at once, as when a wall is arranged in one go. */
+export async function addPlacementsAction(
+  inputs: z.input<typeof newPlacement>[],
+): Promise<string[]> {
+  await requireSession();
+  const ids = z.array(newPlacement).max(60).parse(inputs).map((input) => addPlacement(input));
+  revalidatePath("/", "layout");
+  return ids;
+}
+
 const placementPatch = z.object({
   printSizeId: printSizeId.optional(),
   orientation: orientation.optional(),
+  widthMm: sizeMm,
+  heightMm: sizeMm,
   u: position.optional(),
   v: position.optional(),
   mount: mountSchema.optional(),

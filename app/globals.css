@@ -1,29 +1,49 @@
 @import "tailwindcss";
 
+/*
+ * The look: white architecture, fine dark outlines, a haze of sky behind,
+ * and six clear colours, one for each direction you can face.
+ */
 :root {
   color-scheme: light dark;
-  --paper: #f4f0e8;
-  --card: #fffdf9;
-  --ink: #211e1a;
-  --muted: #6b645a;
-  --line: #ddd5c7;
-  --accent: #2f5d50;
-  --on-accent: #fffdf9;
-  --danger: #a33a27;
-  --caution: #845a0a;
+  --paper: #f3f1ea;
+  --card: #fbfaf6;
+  --ink: #1f2430;
+  --muted: #666c7a;
+  --line: #c9ccd3;
+  --accent: #3d6fd9;
+  --on-accent: #fbfaf6;
+  --danger: #c2392f;
+  --caution: #8a5a00;
+  --sky-top: #d9e3f3;
+  --sky-low: #f1e9df;
+  --way-1: #3d6fd9;
+  --way-2: #d99a1c;
+  --way-3: #d9534a;
+  --way-4: #2f9467;
+  --way-5: #8a5fd0;
+  --way-6: #e07a32;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --paper: #171512;
-    --card: #211e1a;
-    --ink: #f1ebe0;
-    --muted: #a79e90;
-    --line: #39342c;
-    --accent: #8cc0ad;
-    --on-accent: #13211c;
-    --danger: #ec8b76;
-    --caution: #e0b45f;
+    --paper: #10131a;
+    --card: #181c26;
+    --ink: #e9e6de;
+    --muted: #9aa0ae;
+    --line: #353b4a;
+    --accent: #7fa2f0;
+    --on-accent: #10131a;
+    --danger: #ef8b80;
+    --caution: #e3b860;
+    --sky-top: #1a2134;
+    --sky-low: #14161c;
+    --way-1: #7fa2f0;
+    --way-2: #e8b84f;
+    --way-3: #ef8177;
+    --way-4: #5fc494;
+    --way-5: #b193ee;
+    --way-6: #f0a066;
   }
 }
 
@@ -37,9 +57,14 @@
   --color-on-accent: var(--on-accent);
   --color-danger: var(--danger);
   --color-caution: var(--caution);
-  --font-serif: ui-serif, "New York", Georgia, "Noto Serif", serif;
-  --font-sans:
-    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-serif: "Avenir Next", Avenir, "Century Gothic", Futura, ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Avenir Next", Avenir, "Century Gothic", Futura, ui-sans-serif, system-ui, sans-serif;
+  /* Everything is built from straight edges. */
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --radius-2xl: 0;
 }
 
 body {
@@ -51,9 +76,13 @@ body {
 
 h1,
 h2 {
-  font-family: var(--font-serif);
-  font-weight: 500;
-  letter-spacing: -0.01em;
+  font-weight: 300;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+h1 {
+  line-height: 1.25;
 }
 
 @layer components {
@@ -63,29 +92,33 @@ h2 {
     align-items: center;
     justify-content: center;
     gap: 0.4rem;
-    border: 1px solid var(--line);
-    border-radius: 0.5rem;
-    background: var(--card);
-    padding: 0.5rem 0.9rem;
-    font-size: 0.9rem;
+    border: 1px solid var(--ink);
+    background: transparent;
+    padding: 0.5rem 0.95rem;
+    font-size: 0.72rem;
     font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
     cursor: pointer;
-    transition: transform 80ms ease;
+    transition:
+      background-color 120ms ease,
+      color 120ms ease;
   }
 
   .btn:active {
-    transform: scale(0.97);
+    background: var(--ink);
+    color: var(--paper);
   }
 
   .btn:disabled {
     cursor: default;
-    opacity: 0.5;
+    opacity: 0.4;
   }
 
   .btn-primary {
-    border-color: var(--accent);
-    background: var(--accent);
-    color: var(--on-accent);
+    border-color: var(--ink);
+    background: var(--ink);
+    color: var(--paper);
   }
 
   .btn-danger {
@@ -93,30 +126,112 @@ h2 {
     color: var(--danger);
   }
 
+  .btn-quiet {
+    border-color: var(--line);
+  }
+
   .field {
     width: 100%;
     min-height: 2.75rem;
     border: 1px solid var(--line);
-    border-radius: 0.5rem;
     background: var(--card);
     padding: 0.5rem 0.65rem;
     /* Anything under 16px makes iOS Safari zoom in on focus. */
     font-size: 1rem;
   }
 
+  .field:focus-visible {
+    border-color: var(--ink);
+    outline: none;
+  }
+
   .label {
     display: block;
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.3rem;
     color: var(--muted);
-    font-size: 0.8rem;
+    font-size: 0.68rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
   }
 
   .chip {
     display: inline-block;
-    border-radius: 999px;
-    background: var(--line);
-    padding: 0.1rem 0.55rem;
-    font-size: 0.75rem;
+    border: 1px solid var(--line);
+    padding: 0.1rem 0.5rem;
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  /* Small capitals above a section, the way a drawing is annotated. */
+  .eyebrow {
+    color: var(--muted);
+    font-size: 0.68rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+
+  .sky {
+    background: linear-gradient(180deg, var(--sky-top) 0%, var(--paper) 58%, var(--sky-low) 100%);
+  }
+
+  .rule {
+    border-top: 1px solid var(--line);
+  }
+
+  /* A row in a list of walls, furniture or things: a hairline, no box. */
+  .row {
+    display: flex;
+    width: 100%;
+    min-height: 3rem;
+    align-items: center;
+    gap: 0.75rem;
+    border-top: 1px solid var(--line);
+    padding: 0.55rem 0.1rem;
+    text-align: left;
+  }
+
+  .row[aria-pressed="true"],
+  .row[aria-current="true"] {
+    background: var(--card);
+  }
+
+  .swatch {
+    display: inline-block;
+    width: 0.8rem;
+    height: 0.8rem;
+    flex: none;
+    background: var(--way, var(--ink));
+  }
+
+  .hud {
+    border: 1px solid var(--ink);
+    background: color-mix(in srgb, var(--paper) 86%, transparent);
+    backdrop-filter: blur(6px);
+  }
+
+  .hud-btn {
+    display: inline-flex;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0 0.7rem;
+    font-size: 0.68rem;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .hud-btn + .hud-btn {
+    border-left: 1px solid var(--line);
+  }
+
+  .hud-btn[aria-pressed="true"] {
+    background: var(--way, var(--ink));
+    color: var(--paper);
   }
 }
 

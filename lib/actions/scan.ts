@@ -6,7 +6,7 @@ import { z } from "zod";
 import { requireSession } from "../auth";
 import { getRoom, saveRoom } from "../room/store";
 import { setPinBoard } from "../scan/frame";
-import { deleteScan, saveAlignment } from "../scan/store";
+import { applyTapeMeasure, deleteScan, saveAlignment } from "../scan/store";
 
 const alignment = z.object({
   matrix: z.array(z.number().finite()).length(16),
@@ -32,6 +32,13 @@ export async function saveAlignmentAction(
     box.parse(input.box),
     z.boolean().parse(input.tapeChecked),
   );
+  revalidatePath("/", "layout");
+}
+
+/** One wall's width, measured with a tape, corrects the scale of the whole room. */
+export async function applyTapeAction(surfaceId: string, realWidthMm: number) {
+  await requireSession();
+  applyTapeMeasure(z.string().min(1).parse(surfaceId), z.number().min(500).max(20000).parse(realWidthMm));
   revalidatePath("/", "layout");
 }
 

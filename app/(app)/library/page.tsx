@@ -28,9 +28,21 @@ export default async function LibraryPage({
 
   return (
     <>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h1 className="text-3xl">Library</h1>
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <h1 className="text-2xl">Prints</h1>
         <Uploader />
+      </div>
+      <p className="mb-4 max-w-xl text-sm text-muted">
+        Photos and quotes you&apos;d like printed for the walls. Things you
+        already own go under <Link href="/things" className="text-ink underline underline-offset-4">Things</Link>.
+      </p>
+      <div className="mb-4 flex flex-wrap gap-2">
+        <Link href="/sort" className={`btn ${counts.inbox ? "btn-primary" : "btn-quiet"}`}>
+          Sort{counts.inbox ? ` ${counts.inbox} new` : ""}
+        </Link>
+        <Link href="/print" className="btn btn-quiet">
+          Print list
+        </Link>
       </div>
 
       <TextForm />

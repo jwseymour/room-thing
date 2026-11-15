@@ -19,8 +19,9 @@ export default async function ScanPage() {
       )}
       <h1 className="text-3xl">Scan your room</h1>
       <p className="mt-1 mb-5 text-muted">
-        Walk round the room with your phone, and the app builds everything on
-        top of the result: the walls, their sizes, and where pictures go.
+        Walk round the room with your phone, and the app builds the room from
+        the result: the walls and their sizes, the furniture, and how much
+        clear wall there is.
       </p>
 
       <ol className="mb-6 space-y-3">
@@ -39,7 +40,7 @@ export default async function ScanPage() {
           ],
           [
             "Send it here",
-            "When it has finished processing, tap Share, then Export, and pick SPZ (smaller) or PLY. Save it to Files, then add it below. From the phone, the upload goes straight to the laptop.",
+            "When it has finished processing, tap Share, then Export, and pick PLY. Save it to Files, then add it below. From the phone, the upload goes straight to the laptop.",
           ],
         ].map(([title, detail], index) => (
           <li key={title} className="flex gap-3 rounded-lg border border-line bg-card p-3">
@@ -61,8 +62,10 @@ export default async function ScanPage() {
 
       <p className="mt-6 text-sm text-muted">
         Any app that exports a Gaussian splat works: Polycam, Luma, KIRI Engine
-        and others all produce .ply or .spz files. A better scan later simply
-        replaces this one, and your pictures stay where you put them.
+        and others. A .ply file is measured automatically: walls, furniture
+        and clear wall space. Other formats, such as .spz, can be shown and
+        lined up by hand, but the furniture isn&apos;t found in them. A better
+        scan later replaces this one, and your things stay where you put them.
       </p>
     </div>
   );

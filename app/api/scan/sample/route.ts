@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import { hasSession } from "@/lib/auth";
 import { sampleRoomSplats, writeSplatPly } from "@/lib/scan/sample-room";
+import { surveyScan } from "@/lib/scan/ingest";
 import { newScanTarget, recordScan } from "@/lib/scan/store";
 
 /** Adds the made-up sample room as a scan, for trying the app before scanning. */
@@ -18,5 +19,5 @@ export async function POST() {
     bytes: ply.length,
     sample: true,
   });
-  return Response.json({ id: scan.id });
+  return Response.json({ id: scan.id, surveyed: await surveyScan(scan.id) });
 }

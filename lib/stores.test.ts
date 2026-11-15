@@ -428,3 +428,99 @@ describe("scans", () => {
     expect(currentScan()?.tapeCheckedAt).not.toBeNull();
   });
 });
+
+describe("building the room from a scan", () => {
+  it("measures the walls, finds the furniture, and draws each wall", async () => {
+    const { surveyScan } = await import("./scan/ingest");
+    const { sampleRoomSplats, writeSplatPly } = await import("./scan/sample-room");
+    const { wallImagePath } = await import("./scan/store");
+    const target = newScanTarget("ply");
+    const ply = writeSplatPly(sampleRoomSplats(0.6));
+    fs.writeFileSync(target.file, ply);
+    const scan = recordScan({ id: target.id, filename: "sample.ply", fileType: "ply", bytes: ply.length });
+
+    expect(await surveyScan(scan.id)).toBe(true);
+
+    const { doc } = getRoom();
+    const walls = doc.surfaces.filter((s) => s.kind === "wall" && s.pose);
+    expect(walls).toHaveLength(4);
+    // The walls keep their ids, so what was planned on them is still there.
+    expect(walls.map((w) => w.id)).toEqual(["pinboard", "wall-b", "wall-c", "wall-d"]);
+    expect(doc.ceilingMm).toBeGreaterThan(2500);
+    expect(doc.blocks.map((b) => b.kind).sort()).toEqual(["bed", "desk", "tall"]);
+    expect(doc.blocks.every((b) => b.source === "scan")).toBe(true);
+    for (const wall of walls) expect(fs.existsSync(wallImagePath(scan.id, wall.id))).toBe(true);
+    expect(currentScan()?.alignment?.ceilingSeen).toBe(true);
+  });
+
+  it("leaves a file it can't read to be lined up by hand", async () => {
+    const { surveyScan } = await import("./scan/ingest");
+    const target = newScanTarget("ply");
+    fs.writeFileSync(target.file, "ply");
+    const scan = recordScan({ id: target.id, filename: "broken.ply", fileType: "ply", bytes: 3 });
+    expect(await surveyScan(scan.id)).toBe(false);
+    const spz = recordScan({ id: newScanTarget("spz").id, filename: "room.spz", fileType: "spz", bytes: 3 });
+    expect(await surveyScan(spz.id)).toBe(false);
+  });
+
+  it("corrects the whole room from one wall measured with a tape", async () => {
+    const { applyTapeMeasure, deleteScan } = await import("./scan/store");
+    // Drop the unreadable scans from the test above, so the sample is current again.
+    for (let scan = currentScan(); scan && !scan.alignment; scan = currentScan()) deleteScan(scan.id);
+    const before = getRoom().doc;
+    const wall = before.surfaces.find((s) => s.id === "wall-b")!;
+    const width = Math.max(...wall.polygon.map((p) => p.u));
+    const placed = activePlacements("wall-b")[0];
+
+    const k = applyTapeMeasure("wall-b", Math.round(width * 1.02));
+
+    expect(k).toBeCloseTo(1.02, 3);
+    const after = getRoom().doc;
+    expect(after.ceilingMm).toBe(Math.round(before.ceilingMm * k));
+    expect(after.blocks[0].w).toBe(Math.round(before.blocks[0].w * k));
+    expect(after.surfaces.find((s) => s.id === "wall-b")?.source).toBe("tape");
+    // The picture moves with the wall, but keeps its own size.
+    const moved = activePlacements("wall-b").find((p) => p.id === placed.id)!;
+    expect(moved.u).toBe(Math.round(placed.u * k));
+    expect(moved.printSizeId).toBe(placed.printSizeId);
+    expect(currentScan()?.tapeCheckedAt).not.toBeNull();
+    expect(currentScan()?.alignment?.tapeScale).toBeCloseTo(1.02, 3);
+    expect(() => applyTapeMeasure("wall-b", width * 2)).toThrow(/too far/);
+  });
+});
+
+describe("things you already own", () => {
+  it("are kept from the start, stay out of sorting and printing, and hang at their own size", async () => {
+    const { listContent, listThings, updateThing } = await import("./content/store");
+    const { printPlacements, placementOf } = await import("./room/store");
+    const { replaceShownImage } = await import("./content/media");
+    const { id } = await ingestImage(await photo("#aa3311"), "poster.jpg", "upload", "thing");
+
+    expect(listThings().map((t) => t.id)).toContain(id);
+    expect(listContent().some((c) => c.id === id)).toBe(false);
+    expect(inboxBatch(50).some((c) => c.id === id)).toBe(false);
+
+    updateThing(id, { title: "Poster", widthMm: 500, heightMm: 700 });
+    const placement = addPlacement({
+      ...placementInput(id),
+      printSizeId: "own",
+      orientation: "portrait",
+      widthMm: 500,
+      heightMm: 700,
+      state: "up",
+    });
+    expect(placementOf(id)?.id).toBe(placement);
+    expect(placementOf(id)?.state).toBe("up");
+    expect(printPlacements().some((p) => p.id === placement)).toBe(false);
+    // Marking prints as ordered leaves it alone: it's already on the wall.
+    markOrdered();
+    expect(placementOf(id)?.state).toBe("up");
+
+    // Cutting the picture down changes what's shown, and its shape.
+    const cut = await sharp({ create: { width: 100, height: 140, channels: 3, background: "#aa3311" } }).jpeg().toBuffer();
+    await replaceShownImage(id, cut);
+    const thing = listThings().find((t) => t.id === id)!;
+    expect([thing.widthPx, thing.heightPx, thing.imageRev]).toEqual([100, 140, 1]);
+    expect(fs.existsSync(variantPath(id, "original"))).toBe(true);
+  });
+});

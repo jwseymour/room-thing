@@ -7,7 +7,7 @@ import type { Decision } from "@/lib/content/store";
 
 export type DeckCard = {
   id: string;
-  kind: "photo" | "quote" | "reminder";
+  kind: "photo" | "quote" | "reminder" | "thing";
   body: string | null;
   attribution: string | null;
   filename: string | null;

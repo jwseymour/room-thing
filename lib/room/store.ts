@@ -19,7 +19,8 @@ export type StoredRoom = { id: string; version: number; doc: RoomDocument };
 export function getRoom(): StoredRoom {
   const db = getDb();
   const row = db.select().from(rooms).where(eq(rooms.id, ROOM_ID)).get();
-  if (row) return { id: row.id, version: row.version, doc: row.doc };
+  // Parsed, so that rooms saved before a field existed pick up its default.
+  if (row) return { id: row.id, version: row.version, doc: roomDocumentSchema.parse(row.doc) };
 
   const doc = defaultRoom();
   db.transaction((tx) => {
@@ -84,6 +85,11 @@ export function activePlacements(surfaceId?: string): PlacementWithContent[] {
   return rows.map((row) => ({ ...row.wall_placements, content: row.content }));
 }
 
+/** What's on the walls that has to be printed: everything but the things you already own. */
+export function printPlacements(): PlacementWithContent[] {
+  return activePlacements().filter((p) => p.content.kind !== "thing");
+}
+
 function assertMountAllowed(surfaceId: string, mount: Mount): void {
   const surface = getRoom().doc.surfaces.find((s) => s.id === surfaceId);
   if (!surface) throw new Error(`Unknown surface: ${surfaceId}`);
@@ -97,9 +103,12 @@ export function addPlacement(input: {
   contentId: string;
   printSizeId: string;
   orientation: Orientation;
+  widthMm?: number | null;
+  heightMm?: number | null;
   u: number;
   v: number;
   mount: Mount;
+  state?: "planned" | "up";
 }): string {
   assertMountAllowed(input.surfaceId, input.mount);
   const id = randomUUID();
@@ -120,6 +129,8 @@ export function updatePlacement(
   patch: Partial<{
     printSizeId: string;
     orientation: Orientation;
+    widthMm: number | null;
+    heightMm: number | null;
     u: number;
     v: number;
     mount: Mount;
@@ -171,6 +182,11 @@ export function setUp(id: string, up: boolean): void {
     .run();
 }
 
+/** Where a piece of content is on the walls now, if anywhere. */
+export function placementOf(contentId: string): PlacementWithContent | undefined {
+  return activePlacements().find((p) => p.contentId === contentId);
+}
+
 /** Marks everything on one surface as up. Returns how many changed. */
 export function markSurfaceUp(surfaceId: string): number {
   const waiting = activePlacements(surfaceId).filter((p) => p.state !== "up");
@@ -187,7 +203,10 @@ export function markSurfaceUp(surfaceId: string): number {
 }
 
 export function markOrdered(): number {
-  const planned = activePlacements().filter((p) => p.state === "planned");
+  // Things you already own are never ordered.
+  const planned = activePlacements().filter(
+    (p) => p.state === "planned" && p.content.kind !== "thing",
+  );
   const db = getDb();
   db.transaction((tx) => {
     for (const placement of planned) {
