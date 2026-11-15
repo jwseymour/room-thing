@@ -1,8 +1,30 @@
 # Room
 
-A personal app for turning a college room into a place worth being in. It runs entirely on this laptop. There's no hosting and no online database: your photos and data stay in the `data/` folder.
+Plan what goes on your walls before you put a single pin in.
 
-See `Room Design App — Design Intent.md` for what it's for.
+Scan a room with your phone and this app turns the scan into plain geometry: where the walls are, how big they are, what furniture stands where, and how much clear wall is left. Photograph the posters, prints and postcards you own, place them on a wall at true size, and it tells you where to hang each one, measured from the wall's left edge and the floor.
+
+It runs entirely on your own laptop, and you use it from your phone. There's no hosting and no online database: your photos and data stay in the `data/` folder.
+
+![One wall, face on, with eight things arranged in its clear space](docs/screenshots/wall.png)
+
+| | |
+| --- | --- |
+| ![The room drawn as blocks and planes](docs/screenshots/room.png) The room, as geometry | ![The plan from above](docs/screenshots/plan.png) The plan |
+| ![Standing inside the room, looking at a wall](docs/screenshots/inside.png) Standing inside | ![Photos of things, each with a real size](docs/screenshots/things.png) Things you own |
+| ![The hanging guide, with positions for each item](docs/screenshots/hang.png) Hanging guide | ![The print library](docs/screenshots/prints.png) Prints to sort |
+
+Everything in these pictures is made up: the room is the built-in sample, and the posters are drawn by a script.
+
+## Try it without scanning anything
+
+```sh
+npm install
+npm run setup
+npm run demo     # then open http://localhost:3111
+```
+
+`npm run demo` starts the app on a made-up room with eight posters and a few quotes, kept in `demo-data/` and well away from your own `data/`. Sign in with `APP_PASSWORD` from `.env.local`, face a wall on the Room page, and press "Arrange for me". Delete `demo-data/` to start again.
 
 ## How it works
 
@@ -17,7 +39,7 @@ The room starts from a 3D scan. You walk round with your phone, add the file her
 
 Photos and quotes you'd like printed still have their own route, under **Prints**: collect, sort, place, then order.
 
-No scan yet? "Try a sample room" on the scan page loads a made-up one.
+No scan yet? "Try a sample room" on the scan page loads a made-up one, or use `npm run demo` above.
 
 ### What the scan can and can't tell
 
@@ -48,7 +70,7 @@ For development, use `npm run dev`. Run `npm test` for the tests.
 
 The phone talks to the laptop directly, so the laptop has to be awake and running `npm run serve`. While it runs, `npm run serve` stops the laptop going to sleep when idle. Closing the lid still sleeps it, so leave it open and plugged in if you want to sort from elsewhere. Try these in order.
 
-1. **Same Wi-Fi.** Open the address `npm run serve` prints. University and college networks may block devices from reaching each other. If the page never loads, that's the likely cause, so move on to option 2.
+1. **Same Wi-Fi.** Open the address `npm run serve` prints. Shared networks, such as a university's, may block devices from reaching each other. If the page never loads, that's the likely cause, so move on to option 2.
 2. **iPhone Personal Hotspot.** Join the laptop to your phone's hotspot, restart `npm run serve`, and open the new address it prints. This needs nothing installed.
 3. **Tailscale.** Install it on both devices and use the laptop's Tailscale address. It works on any network and encrypts the connection. It's the most convenient if you'll use the app often, though it's the one outside service here: it connects your devices, and your photos and data stay on the laptop.
 

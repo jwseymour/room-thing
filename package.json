@@ -8,6 +8,7 @@
     "start": "next start",
     "serve": "node scripts/addresses.mjs && caffeinate -i next start",
     "setup": "node scripts/setup.mjs",
+    "demo": "node scripts/demo.mjs",
     "lint": "eslint",
     "test": "vitest run",
     "db:generate": "drizzle-kit generate"

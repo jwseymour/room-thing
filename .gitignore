@@ -43,5 +43,8 @@ next-env.d.ts
 # personal data: the database and every photo
 /data
 
+# the made-up room from `npm run demo`
+/demo-data
+
 # personal: the design doc describes me, so it stays on this laptop
 /Room Design App*.md
