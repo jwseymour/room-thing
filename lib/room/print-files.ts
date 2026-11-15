@@ -18,7 +18,7 @@ const escapeXml = (text: string) =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 
-function quoteSvg(body: string, attribution: string | null, w: number, h: number) {
+export function quoteSvg(body: string, attribution: string | null, w: number, h: number) {
   const layout = layoutQuote(body, attribution, w, h);
   const lines = layout.lines
     .map(
@@ -54,6 +54,8 @@ export async function renderPrintFile(item: {
   // orients before it extracts, so the crop applies to the upright image.
   return sharp(variantPath(content.id, "original"))
     .autoOrient()
+    // Diagrams often have a see-through background, which a JPEG would turn black.
+    .flatten({ background: "#ffffff" })
     .extract(crop)
     .resize({
       width: Math.min(crop.width, pxFor(print.w)),

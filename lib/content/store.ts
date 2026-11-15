@@ -75,11 +75,33 @@ export function addText(input: {
   kind: "quote" | "reminder";
   body: string;
   attribution: string | null;
-  source: "upload" | "shortcut";
+  source: "upload" | "shortcut" | "find";
+  sourceUrl?: string | null;
 }): string {
   const id = randomUUID();
   getDb().insert(content).values({ id, ...input }).run();
   return id;
+}
+
+/** A quote or reminder with exactly these words, if there is one already. */
+export function findText(body: string): ContentItem | undefined {
+  return getDb()
+    .select()
+    .from(content)
+    .where(and(eq(content.body, body), ne(content.kind, "thing"), ne(content.kind, "photo")))
+    .get();
+}
+
+/** Records what a found picture is and where it came from. */
+export function describeFound(
+  id: string,
+  details: { title: string; attribution: string | null; sourceUrl: string },
+): void {
+  getDb()
+    .update(content)
+    .set({ ...details, source: "find" })
+    .where(eq(content.id, id))
+    .run();
 }
 
 export function decide(

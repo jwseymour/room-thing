@@ -67,9 +67,11 @@ export const content = sqliteTable(
     /** Text of a quote or reminder. */
     body: text("body"),
     attribution: text("attribution"),
-    source: text("source", { enum: ["upload", "shortcut", "scan"] }).notNull(),
-    /** What a thing is called. */
+    source: text("source", { enum: ["upload", "shortcut", "scan", "find"] }).notNull(),
+    /** What a thing is called, or the name of a picture found online. */
     title: text("title"),
+    /** Where a found picture or quote came from, to go back to it. */
+    sourceUrl: text("source_url"),
     /** A thing's real size, once it's been measured or matched to a paper size. */
     widthMm: integer("width_mm"),
     heightMm: integer("height_mm"),

@@ -4,7 +4,7 @@ Plan what goes on your walls before you put a single pin in.
 
 Scan a room with your phone and this app turns the scan into plain geometry: where the walls are, how big they are, what furniture stands where, and how much clear wall is left. Photograph the posters, prints and postcards you own, place them on a wall at true size, and it tells you where to hang each one, measured from the wall's left edge and the floor.
 
-It runs entirely on your own laptop, and you use it from your phone. There's no hosting and no online database: your photos and data stay in the `data/` folder.
+It runs entirely on your own laptop, and you use it from your phone. There's no hosting and no online database: your photos and data stay in the `data/` folder. The one thing that reaches out is **Find**, which sends the words you search for to the collections it searches.
 
 ![One wall, face on, with eight things arranged in its clear space](docs/screenshots/wall.png)
 
@@ -78,6 +78,41 @@ On shared Wi-Fi, traffic between the phone and laptop is plain `http`, including
 
 Add the page to your Home Screen from Safari's Share menu for a full-screen app.
 
+## Finding things to print
+
+**Find** searches for pictures and lines that are free to print:
+
+- **Pictures** come from Wikimedia Commons, the Met and the Cleveland Museum of Art. Each result says how large it stays sharp.
+- **Words** come from Wikiquote. Search for a person, a book or film, or a theme. Short lines come first.
+
+Press **Keep** and it's saved into **Prints**, already kept, with its title, its credit and a link back to where it came from. None of the sources needs an account or a key.
+
+The page opens on starting points: a few built-in ones, or your own. To set your own, put a file at `data/interests.json`:
+
+```json
+{
+  "groups": [
+    {
+      "name": "Maps",
+      "why": "A line about why this is here. Optional.",
+      "pictures": ["geological map", "celestial chart"],
+      "words": ["Maps", "Travel"]
+    }
+  ],
+  "ownWords": [{ "body": "A line of your own, ready to add.", "kind": "reminder" }]
+}
+```
+
+Wikimedia, which runs Commons and Wikiquote, allows an app that doesn't say who runs it only ten requests a minute, shared by everyone on the same network. On a university or office network that's often used up, and searches come back with "No answer". To be let through, add a line to `.env.local` with an email address or web page of yours, and restart:
+
+```sh
+FIND_CONTACT=you@example.com
+```
+
+It's sent to Wikimedia, the Met and Cleveland with each search, as the contact for the app, and nowhere else.
+
+"Pin this search" on any results page adds that search to the same file. It lives in `data/`, so it stays on your laptop.
+
 ## Saving things from your phone
 
 iOS doesn't let web apps appear in the Share sheet, so a Shortcut does the job. In the Shortcuts app, create one with **Show in Share Sheet** turned on, accepting text and images, and a **Get Contents of URL** action:
@@ -92,7 +127,11 @@ Saved items wait under **Prints**, to be sorted.
 
 ## Printing and hanging
 
-**Prints** holds photos and quotes to be printed. Its print list downloads print-ready files, in a folder per size. Once you mark them as ordered, later downloads hold only what's new. Things you already own never appear there.
+**Prints** holds photos and quotes to be printed. There are two ways to print them.
+
+**Print on paper** is for a home or library printer. Tick what you want, pick a size for each, and it downloads one PDF of A4 sheets with everything laid out at true size and a grey line round each to cut along. It fits as many to a sheet as it can: two A5s, or four postcards. Print at 100% ("actual size"), not "fit to page". A picture can be shown whole, at its own shape, or cropped to fill the size exactly. What you've printed is remembered on that device, so next time only the new things are ticked.
+
+**Print list** is for ordering from a photo printer. It covers what you've placed on a wall, and downloads print-ready files in a folder per size. Once you mark them as ordered, later downloads hold only what's new. Things you already own never appear there.
 
 **Hang** gives each item's position, measured from the left of the wall and from the floor, and lists the pins or strips to have ready. Mark items as up as you go.
 
@@ -106,5 +145,7 @@ The database and every photo live only in `data/`, which is deliberately not in 
 - `lib/room3d/stage.ts` is the 3D view, in plain three.js. It only draws and reports taps and drags; `components/room/RoomScreen.tsx` decides what's shown. The scan itself is drawn with [Spark](https://sparkjs.dev), loaded only when you switch it on.
 - `lib/room/` holds the room model. Every length is in millimetres, and mounting rules are enforced on the server as well as in the interface. `space.ts` works out clear wall space, and `arrange.ts` lays things out in it.
 - `lib/content/` handles things, the print library, photo storage and sorting. `rectify.ts` straightens a photo from its four marked corners.
+- `lib/find/` is the search. `images.ts` asks each picture source and mixes the answers, `quotes.ts` reads quotes off Wikiquote pages, and `interests.ts` holds the starting points. Saving a picture names it to the server, which looks up where to download it from, so the browser never supplies an address.
+- `lib/room/sheets.ts` fits prints onto A4, and `sheet-pdf.ts` writes the PDF by hand, which is short work when a page is only JPEGs at exact sizes.
 - `lib/actions/` holds Server Functions, each of which checks the session itself.
 - `drizzle/` holds database migrations, which run automatically on start. After changing `lib/db/schema.ts`, run `npm run db:generate`.

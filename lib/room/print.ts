@@ -19,6 +19,10 @@ export const PRINT_SIZES: PrintSize[] = [
   { id: "a2", label: "A2", longMm: 594, shortMm: 420 },
 ];
 
+/** The sizes that fit on a sheet of A4, for printing on paper at home. */
+export const A4 = { w: 210, h: 297 };
+export const PAPER_SIZES: PrintSize[] = PRINT_SIZES.filter((s) => s.longMm <= A4.h);
+
 export function printSize(id: string): PrintSize {
   const size = PRINT_SIZES.find((s) => s.id === id);
   if (!size) throw new Error(`Unknown print size: ${id}`);
@@ -93,6 +97,22 @@ export type PrintQuality = {
   cropped: number;
   rating: "good" | "soft" | "too_small";
 };
+
+/**
+ * The largest paper size a picture still looks sharp at when shown whole, or
+ * null if it's too small even for the smallest.
+ */
+export function largestSharpSize(widthPx: number, heightPx: number): PrintSize | null {
+  const long = Math.max(widthPx, heightPx);
+  const short = Math.min(widthPx, heightPx);
+  let best: PrintSize | null = null;
+  for (const size of PAPER_SIZES) {
+    // Shown whole, the picture shrinks until both edges fit.
+    const mmPerPx = Math.min(size.longMm / long, size.shortMm / short);
+    if (25.4 / mmPerPx >= MIN_GOOD_PPI && (!best || size.longMm > best.longMm)) best = size;
+  }
+  return best;
+}
 
 /** Photos are cropped to fill the print, so the tighter axis sets the resolution. */
 export function printQuality(

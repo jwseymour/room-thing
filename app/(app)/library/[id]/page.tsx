@@ -46,7 +46,7 @@ export default async function ContentPage({
       {item.kind === "photo" ? (
         <img
           src={`/api/media/${item.id}/card`}
-          alt={item.filename ?? "Photo"}
+          alt={item.title ?? item.filename ?? "Photo"}
           className="mt-3 max-h-[60dvh] w-full rounded-lg bg-black object-contain"
         />
       ) : (
@@ -58,6 +58,25 @@ export default async function ContentPage({
             </footer>
           )}
         </blockquote>
+      )}
+
+      {(item.title || item.sourceUrl) && (
+        <p className="mt-3 text-sm">
+          {item.kind === "photo" && item.title}
+          {item.kind === "photo" && item.attribution && (
+            <span className="block text-muted">{item.attribution}</span>
+          )}
+          {item.sourceUrl && (
+            <a
+              href={item.sourceUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-muted underline underline-offset-4"
+            >
+              Where it came from
+            </a>
+          )}
+        </p>
       )}
 
       <ContentControls

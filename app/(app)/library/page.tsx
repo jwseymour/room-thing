@@ -40,6 +40,12 @@ export default async function LibraryPage({
         <Link href="/sort" className={`btn ${counts.inbox ? "btn-primary" : "btn-quiet"}`}>
           Sort{counts.inbox ? ` ${counts.inbox} new` : ""}
         </Link>
+        <Link href="/find" className="btn btn-quiet">
+          Find more
+        </Link>
+        <Link href="/print/paper" className={`btn ${counts.keep ? "" : "btn-quiet"}`}>
+          Print on paper
+        </Link>
         <Link href="/print" className="btn btn-quiet">
           Print list
         </Link>
@@ -73,7 +79,7 @@ export default async function LibraryPage({
                 {item.kind === "photo" ? (
                   <img
                     src={`/api/media/${item.id}/thumb`}
-                    alt={item.filename ?? "Photo"}
+                    alt={item.title ?? item.filename ?? "Photo"}
                     loading="lazy"
                     className="size-full object-cover"
                   />

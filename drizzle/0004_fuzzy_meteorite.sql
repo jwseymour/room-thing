@@ -1,0 +1,1 @@
+ALTER TABLE `content` ADD `source_url` text;
