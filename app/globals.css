@@ -1,0 +1,129 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: light dark;
+  --paper: #f4f0e8;
+  --card: #fffdf9;
+  --ink: #211e1a;
+  --muted: #6b645a;
+  --line: #ddd5c7;
+  --accent: #2f5d50;
+  --on-accent: #fffdf9;
+  --danger: #a33a27;
+  --caution: #845a0a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #171512;
+    --card: #211e1a;
+    --ink: #f1ebe0;
+    --muted: #a79e90;
+    --line: #39342c;
+    --accent: #8cc0ad;
+    --on-accent: #13211c;
+    --danger: #ec8b76;
+    --caution: #e0b45f;
+  }
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
+  --color-danger: var(--danger);
+  --color-caution: var(--caution);
+  --font-serif: ui-serif, "New York", Georgia, "Noto Serif", serif;
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+}
+
+h1,
+h2 {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+@layer components {
+  .btn {
+    display: inline-flex;
+    min-height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    border: 1px solid var(--line);
+    border-radius: 0.5rem;
+    background: var(--card);
+    padding: 0.5rem 0.9rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: transform 80ms ease;
+  }
+
+  .btn:active {
+    transform: scale(0.97);
+  }
+
+  .btn:disabled {
+    cursor: default;
+    opacity: 0.5;
+  }
+
+  .btn-primary {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: var(--on-accent);
+  }
+
+  .btn-danger {
+    border-color: var(--danger);
+    color: var(--danger);
+  }
+
+  .field {
+    width: 100%;
+    min-height: 2.75rem;
+    border: 1px solid var(--line);
+    border-radius: 0.5rem;
+    background: var(--card);
+    padding: 0.5rem 0.65rem;
+    /* Anything under 16px makes iOS Safari zoom in on focus. */
+    font-size: 1rem;
+  }
+
+  .label {
+    display: block;
+    margin-bottom: 0.25rem;
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+
+  .chip {
+    display: inline-block;
+    border-radius: 999px;
+    background: var(--line);
+    padding: 0.1rem 0.55rem;
+    font-size: 0.75rem;
+  }
+}
+
+/* Covers e-ink screens like the Boox, where animation just smears. */
+@media (update: slow), (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
