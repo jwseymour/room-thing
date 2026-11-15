@@ -62,7 +62,8 @@ export type EditorPlacement = {
 
 const NO_GUIDES: Guides = { us: [], vs: [] };
 const NUDGE_MM = 5;
-const ZOOMS = [1, 2, 3];
+// 4× makes a 6×4 print on a 3.5 m wall big enough to drag with a thumb.
+const ZOOMS = [1, 2, 4];
 
 const toPlaced = (p: EditorPlacement): PlacedRect => ({
   id: p.id,

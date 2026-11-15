@@ -392,6 +392,35 @@ export function RoomEditor({
         })}
       </div>
 
+      <button
+        type="button"
+        className="btn mt-4"
+        onClick={() =>
+          change((d) => ({
+            ...d,
+            surfaces: [
+              ...d.surfaces,
+              {
+                id: newId(),
+                name: "New surface",
+                kind: "wall",
+                polygon: rectPolygon(1000, d.ceilingMm),
+                pose: null,
+                // The college's default: nothing that leaves a mark.
+                allowedMounts: ["removable_strip", "removable_hook"],
+                source: "estimate",
+              },
+            ],
+          }))
+        }
+      >
+        Add a surface
+      </button>
+      <p className="mt-1 text-xs text-muted">
+        For an alcove, a chimney breast, the side of a wardrobe, or a wall in
+        two parts.
+      </p>
+
       <section className="mt-6 rounded-lg border border-line bg-card p-3">
         <h2 className="text-xl">Accuracy checks</h2>
         <p className="mb-2 text-sm text-muted">

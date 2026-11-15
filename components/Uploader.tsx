@@ -46,7 +46,13 @@ export function Uploader() {
   }
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+      {progress && !uploading && progress.failed.length > 0 && (
+        <p className="w-full text-right text-sm text-danger">
+          Couldn&apos;t add: {progress.failed.slice(0, 5).join(", ")}
+          {progress.failed.length > 5 && ` and ${progress.failed.length - 5} more`}
+        </p>
+      )}
       {progress && (
         <p role="status" className="text-sm text-muted">
           {uploading

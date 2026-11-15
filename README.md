@@ -21,7 +21,7 @@ For development, use `npm run dev`. Run `npm test` for the tests.
 
 ## Using it from your phone
 
-The phone talks to the laptop directly, so the laptop has to be awake and running `npm run serve`. Try these in order.
+The phone talks to the laptop directly, so the laptop has to be awake and running `npm run serve`. While it runs, `npm run serve` stops the laptop going to sleep when idle. Closing the lid still sleeps it, so leave it open and plugged in if you want to sort from elsewhere. Try these in order.
 
 1. **Same Wi-Fi.** Open the address `npm run serve` prints. University and college networks may block devices from reaching each other. If the page never loads, that's the likely cause, so move on to option 2.
 2. **iPhone Personal Hotspot.** Join the laptop to your phone's hotspot, restart `npm run serve`, and open the new address it prints. This needs nothing installed.
@@ -42,6 +42,12 @@ iOS doesn't let web apps appear in the Share sheet, so a Shortcut does the job. 
 - **For images:** Request Body set to Form, with a `file` field.
 
 Saved items wait in **Sort**.
+
+## From sorting to the wall
+
+**Today** shows the next step. Collect and sort first, then plan a couple of walls with rough sizes. Tape-measure only the walls you've used, before ordering.
+
+**Print** downloads print-ready files, in a folder per size. Once you mark them as ordered, later downloads hold only what's new. **Hang** then gives each item's position, measured from the left of the wall and from the floor, and lists the pins or strips to have ready. Mark items as up as you go.
 
 ## Back up `data/`
 
