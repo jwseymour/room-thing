@@ -42,3 +42,6 @@ next-env.d.ts
 
 # personal data: the database and every photo
 /data
+
+# personal: the design doc describes me, so it stays on this laptop
+/Room Design App*.md
