@@ -87,7 +87,10 @@ export function WallEditor({
   fixtures,
   initialPlacements,
   tray,
+  backdropUrl,
 }: {
+  /** A flat picture of this wall from the 3D scan, drawn behind everything. */
+  backdropUrl?: string;
   surface: Surface;
   fixtures: Fixture[];
   initialPlacements: EditorPlacement[];
@@ -308,8 +311,8 @@ export function WallEditor({
     <div>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <Link href="/walls" className="text-sm text-muted">
-            ← Walls
+          <Link href="/room" className="text-sm text-muted">
+            ← Room
           </Link>
           <h1 className="text-2xl">{surface.name}</h1>
           <p className="text-sm text-muted">
@@ -318,8 +321,8 @@ export function WallEditor({
               <>
                 {" "}
                 ·{" "}
-                <Link href="/room" className="text-caution underline">
-                  estimated, measure this
+                <Link href="/room/scan" className="text-caution underline">
+                  estimated, scan the room
                 </Link>
               </>
             )}
@@ -364,6 +367,15 @@ export function WallEditor({
               }
             >
               <rect width={W} height={H} fill="var(--card)" />
+              {backdropUrl && (
+                <image
+                  href={backdropUrl}
+                  width={W}
+                  height={H}
+                  preserveAspectRatio="none"
+                  pointerEvents="none"
+                />
+              )}
               <polygon
                 points={surface.polygon
                   .map((p) => `${p.u},${H - p.v}`)

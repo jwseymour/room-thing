@@ -13,10 +13,10 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   // /api/capture checks its own token, because iOS Shortcuts can't hold a session.
-  // /api/upload checks the session itself and stays out of the proxy, because
-  // the proxy silently cuts request bodies off at 10 MB and full-size photos
-  // are often larger.
+  // /api/upload and /api/scan check the session themselves and stay out of the
+  // proxy, because the proxy silently cuts request bodies off at 10 MB.
+  // Full-size photos are often larger, and scans always are.
   matcher: [
-    "/((?!login|api/capture|api/upload|_next/static|_next/image|favicon.ico).*)",
+    "/((?!login|api/capture|api/upload|api/scan|_next/static|_next/image|favicon.ico).*)",
   ],
 };

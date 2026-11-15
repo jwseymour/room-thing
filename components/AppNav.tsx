@@ -5,9 +5,9 @@ import { usePathname } from "next/navigation";
 
 const ITEMS = [
   { href: "/", label: "Today" },
+  { href: "/room", label: "Room" },
   { href: "/sort", label: "Sort" },
   { href: "/library", label: "Library" },
-  { href: "/walls", label: "Walls" },
   { href: "/print", label: "Print" },
   { href: "/hang", label: "Hang" },
 ];
@@ -15,7 +15,10 @@ const ITEMS = [
 export function AppNav() {
   const pathname = usePathname();
   const isActive = (href: string) =>
-    href === "/" ? pathname === "/" : pathname.startsWith(href);
+    href === "/"
+      ? pathname === "/"
+      : // The flat wall planner is part of the room.
+        pathname.startsWith(href) || (href === "/room" && pathname.startsWith("/walls"));
 
   return (
     <nav

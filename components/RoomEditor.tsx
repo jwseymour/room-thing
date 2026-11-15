@@ -141,14 +141,14 @@ export function RoomEditor({
 
   return (
     <div className="mx-auto max-w-3xl">
-      <Link href="/walls" className="text-sm text-muted">
-        ← Walls
+      <Link href="/room" className="text-sm text-muted">
+        ← Room
       </Link>
-      <h1 className="mb-1 text-3xl">Room</h1>
+      <h1 className="mb-1 text-3xl">Room details</h1>
       <p className="mb-4 text-sm text-muted">
-        All sizes are in millimetres. Enter what the tape says, then mark the
-        surface as Tape. This is the source of truth for every print and
-        hanging position.
+        Wall sizes come from your scan. Add the things pictures must keep
+        clear of here: windows, radiators, sockets and switches. All sizes are
+        in millimetres, and anything you type in overrides the scan.
       </p>
 
       <div className="mb-6 grid grid-cols-2 gap-2">

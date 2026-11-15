@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireSession } from "@/lib/auth";
 import { statusCounts } from "@/lib/content/store";
 import { activePlacements, getRoom } from "@/lib/room/store";
+import { currentScan } from "@/lib/scan/store";
 
 const KEPT_GOAL = 30;
 const WALLS_GOAL = 2;
@@ -17,6 +18,8 @@ export default async function TodayPage() {
   const { doc } = getRoom();
   const counts = statusCounts();
   const placements = activePlacements();
+  const scan = currentScan();
+  const scanned = Boolean(scan?.alignment);
 
   const perWall = new Map<string, number>();
   for (const placement of placements) {
@@ -39,6 +42,18 @@ export default async function TodayPage() {
 
   const steps = [
     {
+      title: "Scan your room",
+      detail: scanned
+        ? scan?.sample
+          ? "Using the sample room. Add your own scan when you're ready"
+          : "Scanned and lined up"
+        : scan
+          ? "Scan added. Line it up with the walls"
+          : "A few minutes walking round with your phone",
+      href: scanned ? "/room" : scan ? "/room/align" : "/room/scan",
+      done: scanned && !scan?.sample,
+    },
+    {
       title: "Collect and sort",
       detail: `${counts.keep} of ${KEPT_GOAL} kept${
         counts.inbox ? `, ${counts.inbox} waiting to sort` : ""
@@ -48,21 +63,30 @@ export default async function TodayPage() {
     },
     {
       title: "Plan two walls",
-      detail: `${plannedWalls} of ${WALLS_GOAL} walls planned. Rough sizes are fine for now`,
-      href: "/walls",
+      detail: `${plannedWalls} of ${WALLS_GOAL} walls planned`,
+      href: scanned ? "/room" : "/walls",
       done: plannedWalls >= WALLS_GOAL,
     },
-    {
-      title: "Measure those walls",
-      detail:
-        inUse.length === 0
-          ? "Tape-measure the walls you've planned, before ordering"
-          : `${measured} of ${inUse.length} planned ${
-              inUse.length === 1 ? "surface" : "surfaces"
-            } measured with a tape`,
-      href: "/room",
-      done: inUse.length > 0 && measured === inUse.length,
-    },
+    scanned
+      ? {
+          title: "Check the scan with a tape",
+          detail: scan?.tapeCheckedAt
+            ? "Checked"
+            : "Measure one wall, so hanging positions are exact",
+          href: "/room/align",
+          done: Boolean(scan?.tapeCheckedAt),
+        }
+      : {
+          title: "Measure those walls",
+          detail:
+            inUse.length === 0
+              ? "Tape-measure the walls you've planned, before ordering"
+              : `${measured} of ${inUse.length} planned ${
+                  inUse.length === 1 ? "surface" : "surfaces"
+                } measured with a tape`,
+          href: "/room/edit",
+          done: inUse.length > 0 && measured === inUse.length,
+        },
     {
       title: "Order the prints",
       detail: ordered
@@ -88,7 +112,7 @@ export default async function TodayPage() {
       <p className="mt-1 mb-6 text-muted">
         {nextIndex === -1
           ? "Live with them for a few weeks, then swap in something new."
-          : "Your first walls, one small step at a time."}
+          : "Your room, one small step at a time."}
       </p>
 
       <ol className="space-y-2">

@@ -96,6 +96,39 @@ export const signals = sqliteTable(
   (t) => [index("signals_content_idx").on(t.contentId, t.createdAt)],
 );
 
+/** A scan-to-room transform, with how the room was found in it. */
+export type ScanAlignment = {
+  /** Column-major 4×4, scan units to room metres. Includes the tape scale. */
+  matrix: number[];
+  up: "y+" | "y-" | "z+" | "z-";
+  /** Multiplier from a tape-measured distance. 1 until one is entered. */
+  tapeScale: number;
+};
+
+/**
+ * A 3D scan of a room: a Gaussian splat file from a scanning app, kept in
+ * `data/scans/<id>/`. The newest one for a room is the one in use.
+ */
+export const scans = sqliteTable(
+  "scans",
+  {
+    id: text("id").primaryKey(),
+    roomId: text("room_id")
+      .notNull()
+      .references(() => rooms.id, { onDelete: "cascade" }),
+    filename: text("filename").notNull(),
+    /** File extension, which is how the viewer picks a decoder. */
+    fileType: text("file_type").notNull(),
+    bytes: integer("bytes").notNull(),
+    sample: integer("sample", { mode: "boolean" }).notNull().default(false),
+    alignment: text("alignment", { mode: "json" }).$type<ScanAlignment>(),
+    /** Set once a tape-measured distance has confirmed the scan's scale. */
+    tapeCheckedAt: integer("tape_checked_at", { mode: "timestamp_ms" }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("scans_room_idx").on(t.roomId, t.createdAt)],
+);
+
 export const PLACEMENT_STATES = ["planned", "ordered", "up", "removed"] as const;
 export type PlacementState = (typeof PLACEMENT_STATES)[number];
 

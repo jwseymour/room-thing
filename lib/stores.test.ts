@@ -28,6 +28,9 @@ const {
   setUp,
   updatePlacement,
 } = await import("./room/store");
+const { currentScan, newScanTarget, recordScan, saveAlignment } = await import(
+  "./scan/store"
+);
 const { printFileNames, renderPrintFile } = await import("./room/print-files");
 
 const photo = (colour: string) =>
@@ -381,5 +384,47 @@ describe("ordering and hanging", () => {
     removePlacement(id);
     setUp(id, true);
     expect(stateOf(id)).toBeUndefined();
+  });
+});
+
+describe("scans", () => {
+  it("lines a scan up and rebuilds the walls, keeping what's planned on them", () => {
+    const contentId = addText({
+      kind: "quote",
+      body: "Stays put",
+      attribution: null,
+      source: "upload",
+    });
+    const placed = addPlacement(placementInput(contentId));
+
+    const target = newScanTarget("ply");
+    fs.writeFileSync(target.file, "ply");
+    const scan = recordScan({ id: target.id, filename: "room.ply", fileType: "ply", bytes: 3 });
+    expect(currentScan()?.id).toBe(scan.id);
+    expect(currentScan()?.alignment).toBeNull();
+
+    const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+    saveAlignment(
+      scan.id,
+      { matrix: identity, up: "y-", tapeScale: 1 },
+      { widthMm: 3400, depthMm: 4200, heightMm: 2550 },
+      false,
+    );
+
+    const saved = currentScan();
+    expect(saved?.alignment?.up).toBe("y-");
+    expect(saved?.tapeCheckedAt).toBeNull();
+    const wallB = getRoom().doc.surfaces.find((s) => s.id === "wall-b");
+    expect(wallB?.source).toBe("scan");
+    expect(wallB?.pose).toEqual({ x: 3400, y: 0, yawDeg: 90 });
+    expect(activePlacements("wall-b").some((p) => p.id === placed)).toBe(true);
+
+    saveAlignment(
+      scan.id,
+      { matrix: identity, up: "y-", tapeScale: 1.01 },
+      { widthMm: 3434, depthMm: 4242, heightMm: 2575 },
+      true,
+    );
+    expect(currentScan()?.tapeCheckedAt).not.toBeNull();
   });
 });

@@ -19,7 +19,7 @@ export default async function WallsPage() {
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-3xl">Walls</h1>
         <Link href="/room" className="btn">
-          Edit room
+          3D room
         </Link>
       </div>
 

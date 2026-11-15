@@ -4,6 +4,17 @@ A personal app for turning a college room into a place worth being in. It runs e
 
 See `Room Design App — Design Intent.md` for what it's for.
 
+## How it works
+
+The room starts from a 3D scan. You walk round with your phone, add the file here, and the app finds the floor, ceiling and walls in it. Everything else sits on that: you look around the room in 3D, tap a wall to put a picture on it at its real size, see it from your bed or your desk, and get print files and a hanging guide at the end.
+
+1. **Scan** with [Scaniverse](https://scaniverse.com) (the original "Classic" app is free for personal use, and works on the phone itself). The Room page has the step-by-step. Any app that exports a Gaussian splat as `.spz` or `.ply` works too.
+2. **Line it up.** The app draws the walls it found over the scan. Confirm it, or nudge them. One tape measurement corrects the whole room's scale.
+3. **Collect and sort** photos and quotes, then **place** them in the 3D room or on a flat view of each wall.
+4. **Print** and **hang**.
+
+No scan yet? "Try a sample room" on the Room page loads a made-up one.
+
 ## Running it
 
 You need Node 24 (`nvm install 24`, then `nvm use`).
@@ -55,9 +66,10 @@ The database and every photo live only in `data/`, which is deliberately not in 
 
 ## How it's built
 
+- `lib/scan/` is the 3D side. `fit.ts` finds the room in a scan's points, `frame.ts` ties each wall to its place in 3D, and `stage.ts` is the viewer, built on three.js and [Spark](https://sparkjs.dev).
 - `lib/room/` holds the room model. Every length is in millimetres, and mounting rules are enforced on the server as well as in the interface.
 - `lib/content/` handles the library, photo storage and sorting.
 - `lib/actions/` holds Server Functions, each of which checks the session itself.
 - `drizzle/` holds database migrations, which run automatically on start. After changing `lib/db/schema.ts`, run `npm run db:generate`.
 
-The tape-measured room model is the source of truth for print sizes and hanging positions. Scans will only ever provide visuals, never measurements.
+Wall sizes come from the scan, which on a LiDAR iPhone is usually right to within two or three centimetres across a room. A tape measurement, when you give one, overrides it.

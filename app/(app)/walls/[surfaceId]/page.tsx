@@ -1,8 +1,10 @@
+import fs from "node:fs";
 import { notFound } from "next/navigation";
 import { WallEditor, type TrayItem } from "@/components/WallEditor";
 import { requireSession } from "@/lib/auth";
 import { listContent } from "@/lib/content/store";
 import { activePlacements, getRoom } from "@/lib/room/store";
+import { currentScan, wallImagePath } from "@/lib/scan/store";
 
 const toTrayItem = ({
   id,
@@ -38,8 +40,17 @@ export default async function WallPage({
     }),
   );
 
+  const scan = currentScan();
+  const hasBackdrop =
+    scan?.alignment && fs.existsSync(wallImagePath(scan.id, surface.id));
+
   return (
     <WallEditor
+      backdropUrl={
+        hasBackdrop
+          ? `/api/scan/${scan.id}/wall/${encodeURIComponent(surface.id)}`
+          : undefined
+      }
       surface={surface}
       fixtures={doc.fixtures.filter((f) => f.surfaceId === surface.id)}
       initialPlacements={placements}

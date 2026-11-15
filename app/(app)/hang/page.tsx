@@ -6,6 +6,7 @@ import { hangingSteps, supplies } from "@/lib/room/hanging";
 import { PRINT_SIZES } from "@/lib/room/print";
 import { MOUNT_LABELS } from "@/lib/room/schema";
 import { activePlacements, getRoom } from "@/lib/room/store";
+import { currentScan } from "@/lib/scan/store";
 
 // Waits for live data instead of showing a placeholder. See app/(app)/page.tsx.
 export const instant = false;
@@ -17,6 +18,7 @@ export default async function HangPage() {
 
   const { doc } = getRoom();
   const placements = activePlacements();
+  const tapeChecked = Boolean(currentScan()?.tapeCheckedAt);
 
   if (placements.length === 0) {
     return (
@@ -90,10 +92,21 @@ export default async function HangPage() {
                 >
                   This surface&apos;s size is still an estimate, so these
                   positions may not fit.{" "}
-                  <Link href="/room" className="underline">
-                    Measure it first
+                  <Link href="/room/scan" className="underline">
+                    Scan the room first
                   </Link>
                   .
+                </p>
+              )}
+
+              {surface.source === "scan" && !tapeChecked && (
+                <p className="mb-2 rounded-lg border border-line p-3 text-sm text-muted">
+                  These positions come from the scan, which is usually right
+                  to within two or three centimetres.{" "}
+                  <Link href="/room/align" className="underline">
+                    Check one distance with a tape
+                  </Link>{" "}
+                  to tighten that up.
                 </p>
               )}
 
