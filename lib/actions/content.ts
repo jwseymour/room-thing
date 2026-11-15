@@ -15,12 +15,23 @@ import { CONTENT_STATUSES, type ContentStatus } from "../db/schema";
 
 const id = z.uuid();
 const decision = z.enum(["keep", "maybe", "no", "more_like_this"]);
+// Capped at ten minutes: longer than that means the phone was put down.
+const dwell = z
+  .number()
+  .int()
+  .min(0)
+  .transform((ms) => Math.min(ms, 600_000))
+  .optional();
 
 // Swipes skip revalidatePath: the deck tracks its own queue, and refreshing it
 // on every card would rebuild the deck mid-swipe.
-export async function decideAction(contentId: string, choice: Decision) {
+export async function decideAction(
+  contentId: string,
+  choice: Decision,
+  dwellMs?: number,
+) {
   await requireSession();
-  decide(id.parse(contentId), decision.parse(choice));
+  decide(id.parse(contentId), decision.parse(choice), dwell.parse(dwellMs));
 }
 
 export async function undoAction(contentId: string) {

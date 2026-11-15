@@ -159,6 +159,33 @@ export function removePlacement(id: string): void {
   });
 }
 
+/**
+ * Records that an item is physically on the wall, or takes that back. An item
+ * that comes back down returns to `ordered`, since the print still exists.
+ */
+export function setUp(id: string, up: boolean): void {
+  getDb()
+    .update(wallPlacements)
+    .set({ state: up ? "up" : "ordered" })
+    .where(and(eq(wallPlacements.id, id), ne(wallPlacements.state, "removed")))
+    .run();
+}
+
+/** Marks everything on one surface as up. Returns how many changed. */
+export function markSurfaceUp(surfaceId: string): number {
+  const waiting = activePlacements(surfaceId).filter((p) => p.state !== "up");
+  const db = getDb();
+  db.transaction((tx) => {
+    for (const placement of waiting) {
+      tx.update(wallPlacements)
+        .set({ state: "up" })
+        .where(eq(wallPlacements.id, placement.id))
+        .run();
+    }
+  });
+  return waiting.length;
+}
+
 export function markOrdered(): number {
   const planned = activePlacements().filter((p) => p.state === "planned");
   const db = getDb();

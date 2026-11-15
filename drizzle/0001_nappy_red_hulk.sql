@@ -1,0 +1,1 @@
+ALTER TABLE `signals` ADD `dwell_ms` integer;

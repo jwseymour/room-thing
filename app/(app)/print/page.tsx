@@ -88,11 +88,27 @@ export default async function PrintPage() {
       )}
 
       <div className="mb-6 flex flex-wrap gap-2">
-        <a href="/api/print" download className="btn btn-primary">
-          Download print files
-        </a>
+        {toOrder > 0 ? (
+          <a href="/api/print" download className="btn btn-primary">
+            Download {toOrder} print {toOrder === 1 ? "file" : "files"}
+          </a>
+        ) : (
+          <Link href="/hang" className="btn btn-primary">
+            Hanging guide
+          </Link>
+        )}
         <MarkOrderedButton count={toOrder} />
+        {toOrder < placements.length && (
+          <a href="/api/print?all=1" download className="btn">
+            Download all {placements.length} again
+          </a>
+        )}
       </div>
+      {toOrder > 0 && toOrder < placements.length && (
+        <p className="-mt-4 mb-6 text-sm text-muted">
+          The download holds only the {toOrder} you haven&apos;t ordered yet.
+        </p>
+      )}
 
       <ul className="divide-y divide-line rounded-lg border border-line bg-card">
         {rows.map(({ placement, surface, issues, quality }) => (
@@ -137,9 +153,9 @@ export default async function PrintPage() {
                     `, ${Math.round(quality.cropped * 100)}% cropped`}
                 </p>
               )}
-              {issues.map((issue) => (
+              {issues.map((issue, index) => (
                 <p
-                  key={issue.message}
+                  key={index}
                   className={
                     issue.severity === "error" ? "text-danger" : "text-caution"
                   }

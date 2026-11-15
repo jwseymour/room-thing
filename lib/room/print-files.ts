@@ -64,10 +64,12 @@ export async function renderPrintFile(item: {
     .toBuffer();
 }
 
-export function printFileName(
-  item: { printSizeId: string; content: PlacementWithContent["content"] },
-  index: number,
-): string {
-  const number = String(index + 1).padStart(2, "0");
-  return `${item.printSizeId}/${item.printSizeId}-${number}.jpg`;
+/** A folder per size, numbered within it, so each folder is one line of a print order. */
+export function printFileNames(items: { printSizeId: string }[]): string[] {
+  const seen = new Map<string, number>();
+  return items.map(({ printSizeId }) => {
+    const n = (seen.get(printSizeId) ?? 0) + 1;
+    seen.set(printSizeId, n);
+    return `${printSizeId}/${printSizeId}-${String(n).padStart(2, "0")}.jpg`;
+  });
 }

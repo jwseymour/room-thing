@@ -21,11 +21,14 @@ const {
   activePlacements,
   addPlacement,
   getRoom,
+  markOrdered,
+  markSurfaceUp,
   removePlacement,
   saveRoom,
+  setUp,
   updatePlacement,
 } = await import("./room/store");
-const { renderPrintFile } = await import("./room/print-files");
+const { printFileNames, renderPrintFile } = await import("./room/print-files");
 
 const photo = (colour: string) =>
   sharp({
@@ -133,6 +136,22 @@ describe("sorting", () => {
     expect(statusCounts().keep).toBe(before.keep + 1);
     expect(statusCounts().inbox).toBe(before.inbox - 1);
     expect(inboxBatch(100).map((i) => i.id)).not.toContain(id);
+  });
+
+  it("records how long the item was looked at", () => {
+    const id = addText({
+      kind: "quote",
+      body: "Lingered over",
+      attribution: null,
+      source: "upload",
+    });
+    decide(id, "keep", 4200);
+    const signal = getDb()
+      .select()
+      .from(signals)
+      .where(eq(signals.contentId, id))
+      .get();
+    expect(signal?.dwellMs).toBe(4200);
   });
 
   it("undo restores the item and removes the reaction", () => {
@@ -289,5 +308,78 @@ describe("print files", () => {
     expect(await corner(print, 20)).toBe(await corner(upright, 20));
     expect(await corner(print, 260)).toBe(await corner(upright, 260));
     expect(await corner(print, 20)).not.toBe(await corner(print, 260));
+  });
+});
+
+describe("print file names", () => {
+  it("numbers within each size", () => {
+    expect(
+      printFileNames([
+        { printSizeId: "a4" },
+        { printSizeId: "6x4" },
+        { printSizeId: "a4" },
+      ]),
+    ).toEqual(["a4/a4-01.jpg", "6x4/6x4-01.jpg", "a4/a4-02.jpg"]);
+  });
+});
+
+describe("ordering and hanging", () => {
+  const stateOf = (id: string) =>
+    activePlacements().find((p) => p.id === id)?.state;
+
+  it("moves an item from planned to ordered to up, and back down", () => {
+    const contentId = addText({
+      kind: "quote",
+      body: "Up it goes",
+      attribution: null,
+      source: "upload",
+    });
+    const id = addPlacement(placementInput(contentId));
+    expect(stateOf(id)).toBe("planned");
+
+    markOrdered();
+    expect(stateOf(id)).toBe("ordered");
+
+    setUp(id, true);
+    expect(stateOf(id)).toBe("up");
+
+    // Ordering again must not pull a hung item back down.
+    markOrdered();
+    expect(stateOf(id)).toBe("up");
+
+    setUp(id, false);
+    expect(stateOf(id)).toBe("ordered");
+  });
+
+  it("marks a whole surface up without touching other surfaces", () => {
+    const contentId = addText({
+      kind: "quote",
+      body: "Elsewhere",
+      attribution: null,
+      source: "upload",
+    });
+    const here = addPlacement(placementInput(contentId));
+    const elsewhere = addPlacement({
+      ...placementInput(contentId),
+      surfaceId: "pinboard",
+      mount: "pin",
+    });
+
+    expect(markSurfaceUp("wall-b")).toBeGreaterThan(0);
+    expect(stateOf(here)).toBe("up");
+    expect(stateOf(elsewhere)).toBe("planned");
+  });
+
+  it("can't bring a removed item back by marking it up", () => {
+    const contentId = addText({
+      kind: "quote",
+      body: "Gone",
+      attribution: null,
+      source: "upload",
+    });
+    const id = addPlacement(placementInput(contentId));
+    removePlacement(id);
+    setUp(id, true);
+    expect(stateOf(id)).toBeUndefined();
   });
 });

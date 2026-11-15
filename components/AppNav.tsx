@@ -9,6 +9,7 @@ const ITEMS = [
   { href: "/library", label: "Library" },
   { href: "/walls", label: "Walls" },
   { href: "/print", label: "Print" },
+  { href: "/hang", label: "Hang" },
 ];
 
 export function AppNav() {
@@ -29,7 +30,7 @@ export function AppNav() {
               <Link
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className={`flex min-h-12 items-center justify-center px-3 text-sm ${
+                className={`flex min-h-12 items-center justify-center px-2 text-sm sm:px-3 ${
                   active ? "font-semibold text-accent" : "text-muted"
                 }`}
               >

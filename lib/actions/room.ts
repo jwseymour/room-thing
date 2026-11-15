@@ -8,8 +8,10 @@ import { mountSchema, type Mount } from "../room/schema";
 import {
   addPlacement,
   markOrdered,
+  markSurfaceUp,
   removePlacement,
   saveRoom,
+  setUp,
   updatePlacement,
 } from "../room/store";
 
@@ -75,5 +77,17 @@ export async function removePlacementAction(id: string) {
 export async function markOrderedAction() {
   await requireSession();
   markOrdered();
+  revalidatePath("/", "layout");
+}
+
+export async function setUpAction(id: string, up: boolean) {
+  await requireSession();
+  setUp(z.uuid().parse(id), z.boolean().parse(up));
+  revalidatePath("/", "layout");
+}
+
+export async function markSurfaceUpAction(surfaceId: string) {
+  await requireSession();
+  markSurfaceUp(z.string().min(1).parse(surfaceId));
   revalidatePath("/", "layout");
 }

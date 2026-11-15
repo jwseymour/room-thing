@@ -55,9 +55,16 @@ export function SwipeDeck({
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   const dragStart = useRef<{ x: number; y: number } | null>(null);
+  const shownAt = useRef(0);
 
   const current = queue[0];
   const sorted = undoStack.length;
+  const currentId = current?.id;
+
+  // Start the clock when a card reaches the top of the deck.
+  useEffect(() => {
+    shownAt.current = performance.now();
+  }, [currentId]);
 
   const commit = useCallback(
     (decision: Decision) => {
@@ -65,6 +72,7 @@ export function SwipeDeck({
       setExiting(decision);
       setError(null);
       const isLast = queue.length === 1;
+      const dwellMs = Math.round(performance.now() - shownAt.current);
 
       window.setTimeout(() => {
         setQueue((q) => q.slice(1));
@@ -73,7 +81,7 @@ export function SwipeDeck({
         setDrag({ x: 0, y: 0 });
         startTransition(async () => {
           try {
-            await decideAction(current.id, decision);
+            await decideAction(current.id, decision, dwellMs);
             if (isLast) router.refresh();
           } catch {
             setError("That didn't save. Is the laptop still on?");

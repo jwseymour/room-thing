@@ -86,6 +86,11 @@ export const signals = sqliteTable(
     type: text("type", {
       enum: ["keep", "maybe", "no", "more_like_this", "placed", "removed"],
     }).notNull(),
+    /**
+     * How long the item was on screen before a sorting decision. Lingering is
+     * a signal of its own, and it can't be recovered later.
+     */
+    dwellMs: integer("dwell_ms"),
     createdAt: createdAt(),
   },
   (t) => [index("signals_content_idx").on(t.contentId, t.createdAt)],

@@ -1,18 +1,28 @@
 import { zipSync } from "fflate";
 import { hasSession } from "@/lib/auth";
-import { printFileName, renderPrintFile } from "@/lib/room/print-files";
+import { printFileNames, renderPrintFile } from "@/lib/room/print-files";
 import { activePlacements } from "@/lib/room/store";
 
-/** Every planned item as print-ready files in a zip, in a folder per size. */
-export async function GET() {
+/**
+ * Print-ready files in a zip, in a folder per size. By default that's only the
+ * items not yet ordered, so a second order doesn't reprint the first. Add
+ * `?all=1` for everything on the walls.
+ */
+export async function GET(request: Request) {
   if (!(await hasSession())) {
     return Response.json({ error: "Not signed in" }, { status: 401 });
   }
 
-  const items = activePlacements();
+  const all = new URL(request.url).searchParams.has("all");
+  const items = activePlacements().filter((p) => all || p.state === "planned");
+  if (items.length === 0) {
+    return Response.json({ error: "Nothing to print" }, { status: 404 });
+  }
+
+  const names = printFileNames(items);
   const files: Record<string, Uint8Array> = {};
   for (const [index, item] of items.entries()) {
-    files[printFileName(item, index)] = await renderPrintFile(item);
+    files[names[index]] = await renderPrintFile(item);
   }
 
   // JPEGs don't compress further, so store them as they are.

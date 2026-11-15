@@ -22,6 +22,7 @@ import {
   type Measurement,
   type Surface,
 } from "./schema";
+import { hangingSteps, supplies } from "./hanging";
 import { snapRect } from "./snap";
 import {
   defaultMount,
@@ -362,5 +363,48 @@ describe("room document", () => {
     const bad = JSON.parse(JSON.stringify(room));
     bad.surfaces[0].allowedMounts = ["nails"];
     expect(() => roomDocumentSchema.parse(bad)).toThrow();
+  });
+});
+
+describe("hanging guide", () => {
+  const item = (id: string, u: number, v: number, extra = {}) => ({
+    id,
+    printSizeId: "6x4",
+    orientation: "landscape" as const,
+    u,
+    v,
+    mount: "pin" as const,
+    ...extra,
+  });
+
+  it("gives the top edge from the floor and the left edge from the wall", () => {
+    const [step] = hangingSteps([item("a", 400, 1500)]);
+    expect(step.fromLeftMm).toBe(400);
+    expect(step.bottomFromFloorMm).toBe(1500);
+    expect(step.topFromFloorMm).toBe(1602);
+  });
+
+  it("orders left to right, and top to bottom within a column", () => {
+    const steps = hangingSteps([
+      item("right", 900, 1500),
+      item("left-low", 105, 1300),
+      item("left-high", 100, 1500),
+    ]);
+    expect(steps.map((s) => s.item.id)).toEqual(["left-high", "left-low", "right"]);
+    expect(steps.map((s) => s.number)).toEqual([1, 2, 3]);
+  });
+
+  it("counts fixings by mount, with more for large prints", () => {
+    const list = supplies([
+      item("a", 0, 0),
+      item("b", 0, 0),
+      item("c", 0, 0, { mount: "removable_strip", printSizeId: "a2" }),
+      item("d", 0, 0, { mount: "removable_hook" }),
+    ]);
+    const quantity = (label: string) =>
+      list.find((s) => s.label === label)?.quantity;
+    expect(quantity("Pins")).toBe(8);
+    expect(quantity("Removable strips")).toBe(6);
+    expect(quantity("Removable hooks")).toBe(1);
   });
 });

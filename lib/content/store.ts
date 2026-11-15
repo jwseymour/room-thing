@@ -63,7 +63,11 @@ export function addText(input: {
   return id;
 }
 
-export function decide(contentId: string, decision: Decision): void {
+export function decide(
+  contentId: string,
+  decision: Decision,
+  dwellMs?: number,
+): void {
   const db = getDb();
   db.transaction((tx) => {
     tx.update(content)
@@ -71,7 +75,7 @@ export function decide(contentId: string, decision: Decision): void {
       .where(eq(content.id, contentId))
       .run();
     tx.insert(signals)
-      .values({ id: randomUUID(), contentId, type: decision })
+      .values({ id: randomUUID(), contentId, type: decision, dwellMs })
       .run();
   });
 }
