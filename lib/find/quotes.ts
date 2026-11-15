@@ -40,7 +40,12 @@ const text = (html: string) =>
     .replace(/\s+/g, " ")
     .trim();
 
-export type RawQuote = { body: string; detail: string | null };
+export type RawQuote = {
+  body: string;
+  detail: string | null;
+  /** The heading it sits under: a year on a person's page, a character on a film's. */
+  section: string | null;
+};
 
 /**
  * Pulls the quotes out of a Wikiquote page. Each is a top-level list item, and
@@ -49,11 +54,12 @@ export type RawQuote = { body: string; detail: string | null };
  */
 export function parseQuotes(html: string): RawQuote[] {
   const quotes: RawQuote[] = [];
-  const tag = /<(\/?)(ul|ol|li|h2|h3|table|figure|dl)\b[^>]*>/gi;
+  const tag = /<(\/?)(ul|ol|li|h2|h3|h4|table|figure|dl)\b[^>]*>/gi;
   let depth = 0;
   /** Lists inside tables, captions and definition lists aren't quotes. */
   let boxed = 0;
   let skipping = false;
+  let section: string | null = null;
   let headingFrom = -1;
   let bodyFrom = -1;
   let body = "";
@@ -62,7 +68,7 @@ export function parseQuotes(html: string): RawQuote[] {
   let open = false;
 
   const finish = () => {
-    if (open && body && !skipping) quotes.push({ body, detail });
+    if (open && body && !skipping) quotes.push({ body, detail, section });
     open = false;
     body = "";
     detail = null;
@@ -76,11 +82,12 @@ export function parseQuotes(html: string): RawQuote[] {
     const at = m.index;
     const after = at + m[0].length;
 
-    if (name === "h2" || name === "h3") {
+    if (name === "h2" || name === "h3" || name === "h4") {
       if (!closing) {
         headingFrom = after;
       } else if (headingFrom >= 0) {
         const heading = text(html.slice(headingFrom, at));
+        section = heading || null;
         // A subsection inside a skipped section stays skipped.
         if (name === "h2" || !skipping) skipping = SKIP_SECTION.test(heading);
         else if (SKIP_SECTION.test(heading)) skipping = true;
@@ -129,6 +136,28 @@ export function parseQuotes(html: string): RawQuote[] {
   return quotes;
 }
 
+/**
+ * Exchanges between characters, which Wikiquote sets as a definition list with
+ * one line each, the speaker in bold. Stage directions in square brackets go.
+ */
+export function parseDialogue(html: string): string[][] {
+  const exchanges: string[][] = [];
+  const block = /<h2\b[^>]*>([\s\S]*?)<\/h2>|<dl>([\s\S]*?)<\/dl>/gi;
+  let skipping = false;
+  for (let m = block.exec(html); m; m = block.exec(html)) {
+    if (m[1] !== undefined) {
+      skipping = SKIP_SECTION.test(text(m[1]));
+      continue;
+    }
+    if (skipping) continue;
+    const lines = [...m[2].matchAll(/<dd>([\s\S]*?)<\/dd>/gi)]
+      .map((dd) => text(dd[1].replace(/<i>\s*[\[(][\s\S]*?[\])]\s*<\/i>/gi, "")).replace(/\s*\[[^\]]*\]/g, "").trim())
+      .filter((line) => /^[^:]{1,40}:\s*\S/.test(line));
+    if (lines.length >= 2) exchanges.push(lines);
+  }
+  return exchanges;
+}
+
 const NOT_A_NAME =
   /^(chapter|book|part|act|page|line|section|letter|preface|introduction|season|episode|volume|vol|ch|p|pp|as quoted|quoted|from|in|the|a|an|variant|translation|source|interview|speech|lecture)$/i;
 
@@ -148,7 +177,11 @@ export function leadingName(detail: string | null): string | null {
  * Who to credit. On a person's page that's the person; on a theme page each
  * quote names its own author; on a page for a book or film it's the work.
  */
-export function toFound(raw: RawQuote, pageTitle: string, isPerson: boolean): FoundQuote | null {
+export function toFound(
+  raw: Pick<RawQuote, "body" | "detail">,
+  pageTitle: string,
+  isPerson: boolean,
+): FoundQuote | null {
   // Wikiquote marks a trimmed start with dots. On a wall the line stands by itself.
   const body = raw.body
     .replace(/^[\s.…]+/, "")
@@ -271,4 +304,143 @@ export async function searchQuotes(q: string, page = 0): Promise<QuoteSearch> {
     console.error(`Wikiquote search for "${q}" failed:`, error);
     return { results: [], pages: [], failed: true, more: false };
   }
+}
+
+// ── One work: a film, a series or a book ────────────────────────────────────
+
+export type WorkKind = "film" | "tv" | "book" | "other";
+
+export type Work = {
+  /** The Wikiquote page, e.g. "Solaris (1972 film)". */
+  pageTitle: string;
+  /** The name alone: "Solaris". */
+  title: string;
+  kind: WorkKind;
+  year: string | null;
+  pageUrl: string;
+  /** Single lines, in the page's order. */
+  lines: FoundQuote[];
+  /** Short exchanges between characters, one speaker to a line. */
+  exchanges: FoundQuote[];
+};
+
+const withoutLabel = (title: string) => title.replace(/\s*\([^)]*\)\s*$/, "").trim();
+const urlOf = (title: string) =>
+  `https://en.wikiquote.org/wiki/${encodeURIComponent(title.replace(/ /g, "_"))}`;
+
+/** Headings that sort a page without naming who is speaking. */
+const NOT_A_CHARACTER =
+  /^(quotes?|others?|misc|dialogue|voice-?overs?|unsourced|sourced|narrat|opening|closing|season|series|episode|chapter|part|book|act|volume|prologue|epilogue|\d)/i;
+
+const EXCHANGE_MAX_LINES = 6;
+const EXCHANGE_MAX_LENGTH = 360;
+
+/** Pages whose titles match, best first: the choices when several works share a name. */
+export async function findWorks(q: string): Promise<string[]> {
+  const search = (await getJson({
+    action: "query",
+    list: "search",
+    srsearch: q,
+    srlimit: "10",
+  })) as { query?: { search?: { title: string }[] } };
+  const hits = (search.query?.search ?? [])
+    .map((hit) => hit.title)
+    .filter((title) => !NOT_A_SUBJECT.test(title));
+  const about = hits
+    .map((title, index) => ({ title, index, distance: distanceFrom(title, q) }))
+    .filter((hit) => hit.distance !== null)
+    .sort((a, b) => a.distance! - b.distance! || a.index - b.index)
+    .map((hit) => hit.title);
+  return (about.length ? about : hits).slice(0, 6);
+}
+
+/** Sorts a page's quotes into single lines and exchanges, crediting characters. */
+export function toWork(
+  pageTitle: string,
+  html: string,
+  categories: string[],
+  /** What was asked for, to pick one book out of its author's page. */
+  q = "",
+): Work {
+  const kind: WorkKind = categories.some((c) => /films?(_|$)/i.test(c))
+    ? "film"
+    : categories.some((c) => /television|TV_series|_series$|anime/i.test(c))
+      ? "tv"
+      : categories.some((c) => /novels|books|plays|poems|literature|short_stories/i.test(c))
+        ? "book"
+        : "other";
+  const year =
+    /\((\d{4})\b/.exec(pageTitle)?.[1] ??
+    categories.map((c) => /^(\d{4})_/.exec(c)?.[1]).find(Boolean) ??
+    null;
+  const title = withoutLabel(pageTitle);
+  const pageUrl = urlOf(pageTitle);
+  const onScreen = kind === "film" || kind === "tv";
+
+  const seen = new Set<string>();
+  const lines: FoundQuote[] = [];
+  for (const raw of parseQuotes(html)) {
+    const body = raw.body
+      .replace(/\s*\[[^\]]*\]/g, "")
+      .replace(/^[\s.…]+/, "")
+      .replace(/^["“”'‘]+|["“”'’]+$/g, "")
+      .trim();
+    if (body.length < MIN_LENGTH || body.length > MAX_LENGTH || seen.has(body)) continue;
+    seen.add(body);
+    const character =
+      onScreen && raw.section && !NOT_A_CHARACTER.test(raw.section) ? raw.section : null;
+    lines.push({
+      body,
+      attribution: character ? `${character}, ${title}` : title,
+      detail: character ? null : raw.section,
+      pageTitle,
+      pageUrl,
+    });
+  }
+
+  const exchanges: FoundQuote[] = [];
+  for (const spoken of parseDialogue(html)) {
+    const body = spoken.join("\n");
+    if (spoken.length > EXCHANGE_MAX_LINES || body.length > EXCHANGE_MAX_LENGTH || seen.has(body)) continue;
+    seen.add(body);
+    exchanges.push({ body, attribution: title, detail: null, pageTitle, pageUrl });
+  }
+
+  // A book often has no page of its own, only a section on its author's. Then
+  // the lines wanted are the ones under that section, credited to the author.
+  if (categories.some((c) => /_births$|_deaths$|^Living_people$/i.test(c))) {
+    const under = lines.filter((line) => line.detail && distanceFrom(line.detail, q) !== null);
+    if (under.length > 0) {
+      const section = under[0].detail!;
+      return {
+        pageTitle,
+        title: withoutLabel(section),
+        kind: "book",
+        year: /\((\d{4})\b/.exec(section)?.[1] ?? null,
+        pageUrl,
+        lines: under.map((line) => ({ ...line, attribution: title, detail: withoutLabel(section) })),
+        exchanges: [],
+      };
+    }
+    return { pageTitle, title, kind: "other", year: null, pageUrl, lines, exchanges };
+  }
+  return { pageTitle, title, kind, year, pageUrl, lines, exchanges };
+}
+
+export async function readWork(pageTitle: string, q = ""): Promise<Work | null> {
+  const data = (await getJson({
+    action: "parse",
+    page: pageTitle,
+    prop: "text|categories",
+    redirects: "1",
+    disabletoc: "1",
+    disableeditsection: "1",
+  })) as { parse?: { title: string; text: string; categories?: { category: string }[] } };
+  if (!data.parse) return null;
+  return toWork(
+    data.parse.title,
+    data.parse.text,
+    (data.parse.categories ?? []).map((c) => c.category),
+    q,
+  );
 }

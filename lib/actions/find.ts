@@ -4,7 +4,7 @@ import { z } from "zod";
 import { requireSession } from "../auth";
 import { ingestImage, UnsupportedImageError } from "../content/media";
 import { addText, decide, describeFound, findText } from "../content/store";
-import { creditLine, downloadImage, IMAGE_SOURCES, resolveImage } from "../find/images";
+import { creditLine, downloadImage, KEEP_SOURCES, resolveImage } from "../find/images";
 import { pinSearch, unpinSearch } from "../find/interests";
 
 export type KeepResult = { ok: true; id: string; already: boolean } | { ok: false; error: string };
@@ -13,7 +13,7 @@ export type KeepResult = { ok: true; id: string; already: boolean } | { ok: fals
 // the results under the reader's thumb. Each button shows its own outcome.
 
 const imageRef = z.object({
-  source: z.enum(IMAGE_SOURCES),
+  source: z.enum(KEEP_SOURCES),
   id: z.string().min(1).max(400),
 });
 

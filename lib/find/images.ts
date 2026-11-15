@@ -5,11 +5,15 @@
  */
 
 import { getJson, request } from "./http";
+import { resolveTmdb } from "./tmdb";
 
 export const IMAGE_SOURCES = ["commons", "met", "cleveland"] as const;
-export type ImageSource = (typeof IMAGE_SOURCES)[number];
+/** Sources a picture can be kept from: the three searched, and stills from TMDB. */
+export const KEEP_SOURCES = [...IMAGE_SOURCES, "tmdb"] as const;
+export type ImageSource = (typeof KEEP_SOURCES)[number];
 
 export const SOURCE_NAMES: Record<ImageSource, string> = {
+  tmdb: "TMDB",
   commons: "Wikimedia Commons",
   met: "The Met",
   cleveland: "Cleveland Museum of Art",
@@ -276,7 +280,10 @@ async function resolveCleveland(id: string): Promise<ResolvedImage | null> {
 
 // ── All together ────────────────────────────────────────────────────────────
 
-const SEARCHERS: Record<ImageSource, (q: string, page: number) => Promise<ResolvedImage[]>> = {
+const SEARCHERS: Record<
+  (typeof IMAGE_SOURCES)[number],
+  (q: string, page: number) => Promise<ResolvedImage[]>
+> = {
   commons: searchCommons,
   met: searchMet,
   cleveland: searchCleveland,
@@ -286,6 +293,7 @@ const RESOLVERS: Record<ImageSource, (id: string) => Promise<ResolvedImage | nul
   commons: resolveCommons,
   met: resolveMet,
   cleveland: resolveCleveland,
+  tmdb: resolveTmdb,
 };
 
 /** One from each source in turn, so no collection crowds out the others. */
@@ -298,10 +306,15 @@ export function interleave<T>(lists: T[][]): T[] {
   return out;
 }
 
-function withoutDownload(image: ResolvedImage): FoundImage {
+export function withoutDownload(image: ResolvedImage): FoundImage {
   const { downloadUrl, ...found } = image;
   void downloadUrl;
   return found;
+}
+
+/** Commons alone, for pictures to go with one named work. */
+export async function searchCommonsFor(q: string): Promise<FoundImage[]> {
+  return (await searchCommons(q, 0)).map(withoutDownload);
 }
 
 export async function searchImages(q: string, page = 0): Promise<ImageSearch> {
@@ -337,6 +350,7 @@ const DOWNLOAD_HOSTS = new Set([
   "thumb.wikimedia.org",
   "images.metmuseum.org",
   "openaccess-cdn.clevelandart.org",
+  "image.tmdb.org",
 ]);
 const MAX_DOWNLOAD_BYTES = 80 * 1024 * 1024;
 

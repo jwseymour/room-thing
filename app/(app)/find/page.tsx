@@ -1,13 +1,14 @@
 import Form from "next/form";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Suspense } from "react";
-import { KeepImage, KeepQuote, PinButton } from "@/components/find/KeepButtons";
+import { BusyHint, LineCard, PictureCard } from "@/components/find/Cards";
+import { KeepQuote, PinButton } from "@/components/find/KeepButtons";
 import { requireSession } from "@/lib/auth";
 import { hasContact } from "@/lib/find/http";
-import { creditLine, searchImages, type FoundImage } from "@/lib/find/images";
+import { searchImages } from "@/lib/find/images";
 import { isPinned, loadInterests, type SearchKind } from "@/lib/find/interests";
-import { searchQuotes, type FoundQuote } from "@/lib/find/quotes";
-import { largestSharpSize } from "@/lib/room/print";
+import { searchQuotes } from "@/lib/find/quotes";
 
 // Waits for live data instead of showing a placeholder. See app/(app)/page.tsx.
 export const instant = false;
@@ -23,6 +24,8 @@ export default async function FindPage({ searchParams }: PageProps<"/find">) {
 
   const params = await searchParams;
   const q = (first(params.q) ?? "").trim().slice(0, 120);
+  // A film or book has a page of its own, with its lines and its pictures together.
+  if (q && first(params.kind) === "work") redirect(`/find/work?${new URLSearchParams({ q })}`);
   const kind: SearchKind = first(params.kind) === "words" ? "words" : "pictures";
   const page = Math.min(40, Math.max(0, Number(first(params.page)) || 0));
   const interests = loadInterests();
@@ -46,12 +49,12 @@ export default async function FindPage({ searchParams }: PageProps<"/find">) {
           defaultValue={q}
           required
           aria-label="Search for"
-          placeholder="An artist, a place, a subject, a writer"
+          placeholder="An artist, a subject, a writer, a film"
           className="field min-w-0 flex-1 basis-60"
         />
         {/* Radios, not two submit buttons: the form only sends its fields. */}
         <div className="flex">
-          {(["pictures", "words"] as const).map((option) => (
+          {(["pictures", "words", "work"] as const).map((option) => (
             <label key={option} className="btn -ml-px cursor-pointer first:ml-0 has-checked:bg-ink has-checked:text-paper">
               <input
                 type="radio"
@@ -60,7 +63,7 @@ export default async function FindPage({ searchParams }: PageProps<"/find">) {
                 defaultChecked={kind === option}
                 className="sr-only"
               />
-              {option === "pictures" ? "Pictures" : "Words"}
+              {option === "pictures" ? "Pictures" : option === "words" ? "Words" : "Film or book"}
             </label>
           ))}
         </div>
@@ -133,54 +136,13 @@ async function Pictures({ q, page }: { q: string; page: number }) {
         <ul className="columns-2 gap-3 sm:columns-3 md:columns-4">
           {results.map((image) => (
             <li key={`${image.source}:${image.id}`} className="mb-3 break-inside-avoid border border-line bg-card">
-              <Picture image={image} />
+              <PictureCard image={image} />
             </li>
           ))}
         </ul>
       )}
       <Pager q={q} kind="pictures" page={page} more={more} />
     </>
-  );
-}
-
-function Picture({ image }: { image: FoundImage }) {
-  const sharp =
-    image.widthPx && image.heightPx ? largestSharpSize(image.widthPx, image.heightPx) : null;
-  return (
-    <>
-      <a href={image.pageUrl} target="_blank" rel="noreferrer">
-        <img
-          src={image.thumbUrl}
-          alt={image.title}
-          loading="lazy"
-          referrerPolicy="no-referrer"
-          className="w-full bg-paper"
-        />
-      </a>
-      <div className="p-2">
-        <p className="line-clamp-2 text-sm">{image.title}</p>
-        <p className="mt-0.5 line-clamp-2 text-xs text-muted">{creditLine(image)}</p>
-        {image.widthPx && image.heightPx && (
-          <p className={`mt-0.5 text-xs ${sharp ? "text-muted" : "text-caution"}`}>
-            {sharp ? `Sharp up to ${sharp.label}` : "Small: postcard at most"}
-          </p>
-        )}
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <KeepImage source={image.source} id={image.id} />
-        </div>
-      </div>
-    </>
-  );
-}
-
-/** Shown when Wikimedia turns a search away and no contact has been set. */
-function BusyHint() {
-  return (
-    <span className="mt-1 block text-muted">
-      Wikimedia allows an unnamed app ten searches a minute for everyone on
-      your network. Wait a minute, or set FIND_CONTACT in .env.local (see the
-      README) to be let through.
-    </span>
   );
 }
 
@@ -207,33 +169,12 @@ async function Words({ q, page }: { q: string; page: number }) {
         <ul className="grid gap-3 sm:grid-cols-2">
           {results.map((quote) => (
             <li key={quote.body} className="border border-line bg-card p-4">
-              <Line quote={quote} />
+              <LineCard quote={quote} />
             </li>
           ))}
         </ul>
       )}
       <Pager q={q} kind="words" page={page} more={more} />
-    </>
-  );
-}
-
-function Line({ quote }: { quote: FoundQuote }) {
-  return (
-    <>
-      <blockquote className="text-lg leading-snug">{quote.body}</blockquote>
-      <p className="mt-2 text-sm">{quote.attribution}</p>
-      {quote.detail && <p className="mt-0.5 line-clamp-2 text-xs text-muted">{quote.detail}</p>}
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <KeepQuote
-          body={quote.body}
-          attribution={quote.attribution}
-          kind="quote"
-          sourceUrl={quote.pageUrl}
-        />
-        <a href={quote.pageUrl} target="_blank" rel="noreferrer" className="text-xs text-muted underline underline-offset-4">
-          In context
-        </a>
-      </div>
     </>
   );
 }

@@ -7,7 +7,7 @@ const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "room-find-test-"));
 vi.stubEnv("DATA_DIR", dataDir);
 
 const { creditLine, interleave, plainText } = await import("./images");
-const { distanceFrom, leadingName, parseQuotes, toFound } = await import("./quotes");
+const { distanceFrom, leadingName, parseDialogue, parseQuotes, toFound, toWork } = await import("./quotes");
 const { isPinned, loadInterests, pinSearch, unpinSearch } = await import("./interests");
 
 afterAll(() => fs.rmSync(dataDir, { recursive: true, force: true }));
@@ -30,9 +30,9 @@ const PAGE = `
 describe("reading a Wikiquote page", () => {
   it("takes each top-level item as a quote, with its first source line", () => {
     expect(parseQuotes(PAGE)).toEqual([
-      { body: "A line is a dot that went for a walk.", detail: "Pedagogical Sketchbook (1925)" },
-      { body: "Art does not reproduce the visible; rather, it makes visible.", detail: null },
-      { body: "Colour & I are one.", detail: "Diary, 1914" },
+      { body: "A line is a dot that went for a walk.", detail: "Pedagogical Sketchbook (1925)", section: "Quotes" },
+      { body: "Art does not reproduce the visible; rather, it makes visible.", detail: null, section: "Quotes" },
+      { body: "Colour & I are one.", detail: "Diary, 1914", section: "1920s" },
     ]);
   });
 
@@ -63,6 +63,58 @@ describe("reading a Wikiquote page", () => {
   it("leaves out lines too long for a wall, and lines of dialogue", () => {
     expect(toFound({ body: "x".repeat(400), detail: null }, "A", true)).toBeNull();
     expect(toFound({ body: "Deckard: I've seen things you wouldn't believe.", detail: null }, "A", false)).toBeNull();
+  });
+});
+
+const FILM = `
+<h2 id="Roy_Batty">Roy Batty</h2>
+<ul><li>All those moments will be lost in time, like tears in rain. <i>[pause]</i> Time to die.</li>
+<li>Quite an experience to live in fear, isn't it?</li></ul>
+<h2 id="Others">Others</h2>
+<ul><li>It's too bad she won't live! But then again, who does?</li></ul>
+<h2 id="Dialogue">Dialogue</h2>
+<dl><dd><b>Holden</b>: Describe your mother.</dd>
+<dd><b>Leon</b>: Let me tell you about my mother! <i>[shoots Holden]</i></dd></dl>
+<hr />
+<dl><dd><b>Tyrell</b>: ${"A very long speech. ".repeat(30)}</dd><dd><b>Roy</b>: Yes.</dd></dl>
+<h2 id="Taglines">Taglines</h2>
+<ul><li>Man has made his match... now it's his problem.</li></ul>
+<dl><dd><b>A</b>: Not from the film.</dd><dd><b>B</b>: Indeed not.</dd></dl>`;
+
+describe("reading one film", () => {
+  const work = toWork("Blade Runner (1982 film)", FILM, ["1982_American_films", "Neo-noir"]);
+
+  it("knows what it is from the page's name and categories", () => {
+    expect(work).toMatchObject({ title: "Blade Runner", kind: "film", year: "1982" });
+    expect(toWork("Invisible Cities", "", ["1972_novels"])).toMatchObject({ kind: "book", year: "1972" });
+  });
+
+  it("credits a line to its character, and leaves out stage directions and taglines", () => {
+    expect(work.lines.map((l) => [l.body, l.attribution])).toEqual([
+      ["All those moments will be lost in time, like tears in rain. Time to die.", "Roy Batty, Blade Runner"],
+      ["Quite an experience to live in fear, isn't it?", "Roy Batty, Blade Runner"],
+      ["It's too bad she won't live! But then again, who does?", "Blade Runner"],
+    ]);
+  });
+
+  it("picks a book out of its author's page", () => {
+    const page = `<h2>Quotes</h2><ul><li>An early line that is not from it at all.</li></ul>
+      <h3><i>Invisible Cities</i> (1972)</h3>
+      <ul><li>Cities, like dreams, are made of desires and fears.</li></ul>
+      <h3>Later</h3><ul><li>Another line from somewhere else entirely.</li></ul>`;
+    const book = toWork("Italo Calvino", page, ["1923_births"], "invisible cities");
+    expect(book).toMatchObject({ title: "Invisible Cities", kind: "book", year: "1972" });
+    expect(book.lines.map((l) => [l.body, l.attribution])).toEqual([
+      ["Cities, like dreams, are made of desires and fears.", "Italo Calvino"],
+    ]);
+    expect(toWork("Italo Calvino", page, ["1923_births"], "Calvino").lines).toHaveLength(3);
+  });
+
+  it("keeps short exchanges, one speaker to a line", () => {
+    expect(parseDialogue(FILM)).toHaveLength(2);
+    expect(work.exchanges.map((e) => e.body)).toEqual([
+      "Holden: Describe your mother.\nLeon: Let me tell you about my mother!",
+    ]);
   });
 });
 

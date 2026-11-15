@@ -85,6 +85,10 @@ Add the page to your Home Screen from Safari's Share menu for a full-screen app.
 - **Pictures** come from Wikimedia Commons, the Met and the Cleveland Museum of Art. Each result says how large it stays sharp.
 - **Words** come from Wikiquote. Search for a person, a book or film, or a theme. Short lines come first.
 
+- **Film or book** takes one title and gathers what there is for it: its lines from Wikiquote, each credited to the character who says it, short exchanges between characters, and pictures. A book with no page of its own is read off its author's page.
+
+Stills from a film come from [TMDB](https://www.themoviedb.org), which needs a free key: make an account, ask for an API key under Settings, and add it to `.env.local` as `TMDB_API_KEY`. Without one you get what Wikimedia Commons has, which is mostly films old enough to be out of copyright. Stills belong to the film's makers, so they're for your own wall and no further. This app uses the TMDB API but isn't endorsed or certified by TMDB.
+
 Press **Keep** and it's saved into **Prints**, already kept, with its title, its credit and a link back to where it came from. None of the sources needs an account or a key.
 
 The page opens on starting points: a few built-in ones, or your own. To set your own, put a file at `data/interests.json`:
@@ -145,7 +149,7 @@ The database and every photo live only in `data/`, which is deliberately not in 
 - `lib/room3d/stage.ts` is the 3D view, in plain three.js. It only draws and reports taps and drags; `components/room/RoomScreen.tsx` decides what's shown. The scan itself is drawn with [Spark](https://sparkjs.dev), loaded only when you switch it on.
 - `lib/room/` holds the room model. Every length is in millimetres, and mounting rules are enforced on the server as well as in the interface. `space.ts` works out clear wall space, and `arrange.ts` lays things out in it.
 - `lib/content/` handles things, the print library, photo storage and sorting. `rectify.ts` straightens a photo from its four marked corners.
-- `lib/find/` is the search. `images.ts` asks each picture source and mixes the answers, `quotes.ts` reads quotes off Wikiquote pages, and `interests.ts` holds the starting points. Saving a picture names it to the server, which looks up where to download it from, so the browser never supplies an address.
+- `lib/find/` is the search. `images.ts` asks each picture source and mixes the answers, `quotes.ts` reads quotes off Wikiquote pages, for a subject or for one film or book, `tmdb.ts` fetches film stills, and `interests.ts` holds the starting points. Saving a picture names it to the server, which looks up where to download it from, so the browser never supplies an address.
 - `lib/room/sheets.ts` fits prints onto A4, and `sheet-pdf.ts` writes the PDF by hand, which is short work when a page is only JPEGs at exact sizes.
 - `lib/actions/` holds Server Functions, each of which checks the session itself.
 - `drizzle/` holds database migrations, which run automatically on start. After changing `lib/db/schema.ts`, run `npm run db:generate`.
