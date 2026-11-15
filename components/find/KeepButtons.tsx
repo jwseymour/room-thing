@@ -45,8 +45,8 @@ function KeepState({
   );
 }
 
-export function KeepImage({ source, id }: { source: string; id: string }) {
-  const state = useKeep(() => keepImageAction(source, id));
+export function KeepImage({ source, id, caption }: { source: string; id: string; caption?: string }) {
+  const state = useKeep(() => keepImageAction(source, id, caption));
   return <KeepState {...state} busyLabel="Fetching" />;
 }
 

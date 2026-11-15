@@ -1,8 +1,10 @@
 import Form from "next/form";
 import Link from "next/link";
 import { Suspense } from "react";
+import { Assistant } from "@/components/find/Assistant";
 import { BusyHint, LineCard, PictureCard } from "@/components/find/Cards";
 import { requireSession } from "@/lib/auth";
+import { hasAssistant } from "@/lib/find/assist";
 import { hasContact } from "@/lib/find/http";
 import { searchCommonsFor, type FoundImage } from "@/lib/find/images";
 import { findWorks, readWork, type Work } from "@/lib/find/quotes";
@@ -115,6 +117,21 @@ async function Found({ q, chosen, all }: { q: string; chosen: string; all: boole
         </div>
       )}
 
+      {hasAssistant() ? (
+        <Assistant
+          page={work.pageTitle}
+          q={q}
+          title={work.title}
+          onScreen={work.kind === "film" || work.kind === "tv"}
+        />
+      ) : (
+        <p className="mb-8 max-w-xl border border-line p-4 text-sm text-muted">
+          Claude can pick lines and scenes for you here, and search the web for
+          more than this page found. Add a Claude API key to .env.local as
+          ANTHROPIC_API_KEY and restart (see the README).
+        </p>
+      )}
+
       <section className="mb-8">
         <h3 className="eyebrow mb-2">Scenes</h3>
         <Suspense fallback={<p role="status" className="py-6 text-sm text-muted">Finding pictures…</p>}>
@@ -125,7 +142,7 @@ async function Found({ q, chosen, all }: { q: string; chosen: string; all: boole
       <section className="mb-8">
         <h3 className="eyebrow mb-2">Lines</h3>
         {work.lines.length === 0 ? (
-          <p className="text-sm text-muted">No single lines short enough for a wall on its page.</p>
+          <p className="text-sm text-muted">No short lines on its page.</p>
         ) : (
           <ul className="grid gap-3 sm:grid-cols-2">
             {lines.map((quote) => (
@@ -135,12 +152,26 @@ async function Found({ q, chosen, all }: { q: string; chosen: string; all: boole
             ))}
           </ul>
         )}
-        {!all && work.lines.length > SHOWN_AT_FIRST && (
+        {!all && (work.lines.length > SHOWN_AT_FIRST || work.passages.length > 12) && (
           <Link href={link({ all: "1" })} className="btn mt-4">
-            All {work.lines.length} lines
+            Show everything
           </Link>
         )}
       </section>
+
+      {work.passages.length > 0 && (
+        <section className="mb-8">
+          <h3 className="eyebrow mb-2">Passages</h3>
+          <p className="mb-2 text-sm text-muted">Longer stretches, for a sheet of their own.</p>
+          <ul className="grid gap-3 sm:grid-cols-2">
+            {(all ? work.passages : work.passages.slice(0, 12)).map((quote) => (
+              <li key={quote.body} className="border border-line bg-card p-4">
+                <LineCard quote={quote} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {work.exchanges.length > 0 && (
         <section className="mb-8">

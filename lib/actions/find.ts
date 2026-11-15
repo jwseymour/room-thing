@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { requireSession } from "../auth";
+import { captionImage } from "../content/caption";
 import { ingestImage, UnsupportedImageError } from "../content/media";
 import { addText, decide, describeFound, findText } from "../content/store";
 import { creditLine, downloadImage, KEEP_SOURCES, resolveImage } from "../find/images";
@@ -21,18 +22,25 @@ const imageRef = z.object({
  * Saves a found picture into the print library, already kept. The browser only
  * names the picture; where to download it from is looked up again here.
  */
-export async function keepImageAction(source: string, id: string): Promise<KeepResult> {
+export async function keepImageAction(
+  source: string,
+  id: string,
+  /** A line to set along the bottom of the picture, like a subtitle. */
+  caption = "",
+): Promise<KeepResult> {
   await requireSession();
   const ref = imageRef.safeParse({ source, id });
   if (!ref.success) return { ok: false, error: "That picture can't be saved." };
   try {
     const image = await resolveImage(ref.data.source, ref.data.id);
     if (!image) return { ok: false, error: "The source no longer lists that picture." };
-    const bytes = await downloadImage(image.downloadUrl);
+    const line = caption.trim().slice(0, 300);
+    const original = await downloadImage(image.downloadUrl);
+    const bytes = line ? await captionImage(original, line) : original;
     const saved = await ingestImage(bytes, `${image.title.slice(0, 80)}.jpg`, "upload");
     if (!saved.duplicate) {
       describeFound(saved.id, {
-        title: image.title,
+        title: line ? `${image.title}: “${line.slice(0, 80)}”` : image.title,
         attribution: creditLine(image) || null,
         sourceUrl: image.pageUrl,
       });
@@ -48,7 +56,7 @@ export async function keepImageAction(source: string, id: string): Promise<KeepR
 }
 
 const quote = z.object({
-  body: z.string().trim().min(1).max(600),
+  body: z.string().trim().min(1).max(900),
   attribution: z.string().trim().max(120),
   kind: z.enum(["quote", "reminder"]),
   sourceUrl: z.url().max(600).nullable(),

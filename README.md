@@ -89,6 +89,15 @@ Add the page to your Home Screen from Safari's Share menu for a full-screen app.
 
 Stills from a film come from [TMDB](https://www.themoviedb.org), which needs a free key: make an account, ask for an API key under Settings, and add it to `.env.local` as `TMDB_API_KEY`. Without one you get what Wikimedia Commons has, which is mostly films old enough to be out of copyright. Stills belong to the film's makers, so they're for your own wall and no further. This app uses the TMDB API but isn't endorsed or certified by TMDB.
 
+### Asking Claude
+
+On a film or book's page, **Ask Claude** takes a request in your own words: "the quiet lines", "the scene on the rooftop, with its line", "the memes", "the passage about the sea". Claude reads the lines the page found, looks at the film's stills, and searches the web for more, which matters most for books, where Wikiquote is thin. It comes back with:
+
+- **Lines**, each marked as on Wikiquote, checked online, or from memory. Check a "from memory" one before you print it.
+- **Scenes**: stills it picked by looking at them, each with a note on what it shows. A scene can carry a caption, set along the bottom like a subtitle, which you can change or clear before keeping. That's a scene card, or a meme.
+
+It needs a Claude API key: create one at [platform.claude.com](https://platform.claude.com), add it to `.env.local` as `ANTHROPIC_API_KEY`, and restart. Each request costs a few pence and takes a minute or two. This is the one part of the app that sends anything to a hosted model: the title, your request, the lines found, and links to the stills. `FIND_MODEL` in `.env.local` picks a different Claude model; the default is `claude-opus-5-5`.
+
 Press **Keep** and it's saved into **Prints**, already kept, with its title, its credit and a link back to where it came from. None of the sources needs an account or a key.
 
 The page opens on starting points: a few built-in ones, or your own. To set your own, put a file at `data/interests.json`:
@@ -149,7 +158,7 @@ The database and every photo live only in `data/`, which is deliberately not in 
 - `lib/room3d/stage.ts` is the 3D view, in plain three.js. It only draws and reports taps and drags; `components/room/RoomScreen.tsx` decides what's shown. The scan itself is drawn with [Spark](https://sparkjs.dev), loaded only when you switch it on.
 - `lib/room/` holds the room model. Every length is in millimetres, and mounting rules are enforced on the server as well as in the interface. `space.ts` works out clear wall space, and `arrange.ts` lays things out in it.
 - `lib/content/` handles things, the print library, photo storage and sorting. `rectify.ts` straightens a photo from its four marked corners.
-- `lib/find/` is the search. `images.ts` asks each picture source and mixes the answers, `quotes.ts` reads quotes off Wikiquote pages, for a subject or for one film or book, `tmdb.ts` fetches film stills, and `interests.ts` holds the starting points. Saving a picture names it to the server, which looks up where to download it from, so the browser never supplies an address.
+- `lib/find/` is the search. `images.ts` asks each picture source and mixes the answers, `quotes.ts` reads quotes off Wikiquote pages, for a subject or for one film or book, `tmdb.ts` fetches film stills, `assist.ts` asks Claude for picks, and `interests.ts` holds the starting points. Saving a picture names it to the server, which looks up where to download it from, so the browser never supplies an address.
 - `lib/room/sheets.ts` fits prints onto A4, and `sheet-pdf.ts` writes the PDF by hand, which is short work when a page is only JPEGs at exact sizes.
 - `lib/actions/` holds Server Functions, each of which checks the session itself.
 - `drizzle/` holds database migrations, which run automatically on start. After changing `lib/db/schema.ts`, run `npm run db:generate`.

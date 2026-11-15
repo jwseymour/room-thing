@@ -110,11 +110,39 @@ describe("reading one film", () => {
     expect(toWork("Italo Calvino", page, ["1923_births"], "Calvino").lines).toHaveLength(3);
   });
 
+  it("sets long stretches aside as passages", () => {
+    const long = `It was ${"a long sentence about the city, and ".repeat(9)}the end.`;
+    const book = toWork("A Book", `<h2>Chapter 1</h2><ul><li>${long}</li><li>A short line from the book.</li></ul>`, ["1972_novels"]);
+    expect(book.lines.map((l) => l.body)).toEqual(["A short line from the book."]);
+    expect(book.passages).toHaveLength(1);
+    expect(book.passages[0].detail).toBe("Chapter 1");
+  });
+
   it("keeps short exchanges, one speaker to a line", () => {
     expect(parseDialogue(FILM)).toHaveLength(2);
     expect(work.exchanges.map((e) => e.body)).toEqual([
       "Holden: Describe your mother.\nLeon: Let me tell you about my mother!",
     ]);
+  });
+});
+
+describe("asking Claude", () => {
+  it("sends the work, the request, the lines found and each still with its number", async () => {
+    const { buildRequest } = await import("./assist");
+    const work = toWork("Blade Runner (1982 film)", FILM, ["1982_American_films"]);
+    const still = {
+      source: "tmdb" as const, id: "movie:78:/a.jpg", title: "Still", creator: null, date: "1982", licence: null,
+      thumbUrl: "https://image.tmdb.org/t/p/w780/a.jpg", pageUrl: "https://www.themoviedb.org/movie/78", widthPx: 3840, heightPx: 2160,
+    };
+    const content = buildRequest(work, [still, still], "the quiet lines", ["Impossible spaces"]);
+    const text = content[0].type === "text" ? content[0].text : "";
+    expect(text).toContain("Blade Runner (1982), a film");
+    expect(text).toContain("What they asked for: the quiet lines");
+    expect(text).toContain("tears in rain. Time to die. [Roy Batty, Blade Runner]");
+    expect(text).toContain("Holden: Describe your mother. / Leon:");
+    expect(text).toContain("Impossible spaces");
+    expect(content.map((block) => block.type)).toEqual(["text", "text", "image", "text", "image"]);
+    expect(content[2]).toMatchObject({ source: { type: "url", url: "https://image.tmdb.org/t/p/w300/a.jpg" } });
   });
 });
 

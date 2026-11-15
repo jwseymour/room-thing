@@ -322,6 +322,8 @@ export type Work = {
   lines: FoundQuote[];
   /** Short exchanges between characters, one speaker to a line. */
   exchanges: FoundQuote[];
+  /** Longer stretches, too long to read across a room but fine on a sheet of their own. */
+  passages: FoundQuote[];
 };
 
 const withoutLabel = (title: string) => title.replace(/\s*\([^)]*\)\s*$/, "").trim();
@@ -332,6 +334,7 @@ const urlOf = (title: string) =>
 const NOT_A_CHARACTER =
   /^(quotes?|others?|misc|dialogue|voice-?overs?|unsourced|sourced|narrat|opening|closing|season|series|episode|chapter|part|book|act|volume|prologue|epilogue|\d)/i;
 
+const PASSAGE_MAX_LENGTH = 800;
 const EXCHANGE_MAX_LINES = 6;
 const EXCHANGE_MAX_LENGTH = 360;
 
@@ -379,17 +382,18 @@ export function toWork(
 
   const seen = new Set<string>();
   const lines: FoundQuote[] = [];
+  const passages: FoundQuote[] = [];
   for (const raw of parseQuotes(html)) {
     const body = raw.body
       .replace(/\s*\[[^\]]*\]/g, "")
       .replace(/^[\s.…]+/, "")
       .replace(/^["“”'‘]+|["“”'’]+$/g, "")
       .trim();
-    if (body.length < MIN_LENGTH || body.length > MAX_LENGTH || seen.has(body)) continue;
+    if (body.length < MIN_LENGTH || body.length > PASSAGE_MAX_LENGTH || seen.has(body)) continue;
     seen.add(body);
     const character =
       onScreen && raw.section && !NOT_A_CHARACTER.test(raw.section) ? raw.section : null;
-    lines.push({
+    (body.length > MAX_LENGTH ? passages : lines).push({
       body,
       attribution: character ? `${character}, ${title}` : title,
       detail: character ? null : raw.section,
@@ -409,22 +413,26 @@ export function toWork(
   // A book often has no page of its own, only a section on its author's. Then
   // the lines wanted are the ones under that section, credited to the author.
   if (categories.some((c) => /_births$|_deaths$|^Living_people$/i.test(c))) {
-    const under = lines.filter((line) => line.detail && distanceFrom(line.detail, q) !== null);
-    if (under.length > 0) {
-      const section = under[0].detail!;
+    const isUnder = (line: FoundQuote) => line.detail !== null && distanceFrom(line.detail, q) !== null;
+    const under = lines.filter(isUnder);
+    const longUnder = passages.filter(isUnder);
+    if (under.length + longUnder.length > 0) {
+      const section = (under[0] ?? longUnder[0]).detail!;
+      const credit = (line: FoundQuote) => ({ ...line, attribution: title, detail: withoutLabel(section) });
       return {
         pageTitle,
         title: withoutLabel(section),
         kind: "book",
         year: /\((\d{4})\b/.exec(section)?.[1] ?? null,
         pageUrl,
-        lines: under.map((line) => ({ ...line, attribution: title, detail: withoutLabel(section) })),
+        lines: under.map(credit),
         exchanges: [],
+        passages: longUnder.map(credit),
       };
     }
-    return { pageTitle, title, kind: "other", year: null, pageUrl, lines, exchanges };
+    return { pageTitle, title, kind: "other", year: null, pageUrl, lines, exchanges, passages };
   }
-  return { pageTitle, title, kind, year, pageUrl, lines, exchanges };
+  return { pageTitle, title, kind, year, pageUrl, lines, exchanges, passages };
 }
 
 export async function readWork(pageTitle: string, q = ""): Promise<Work | null> {
