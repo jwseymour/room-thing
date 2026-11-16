@@ -80,12 +80,17 @@ Add the page to your Home Screen from Safari's Share menu for a full-screen app.
 
 ## Finding things to print
 
-**Find** searches for pictures and lines that are free to print:
+**Find** is one box and three buttons. Type anything, then press the way you want it searched. After a search the same buttons switch between the three, keeping your words:
 
-- **Pictures** come from Wikimedia Commons, the Met and the Cleveland Museum of Art. Each result says how large it stays sharp.
+- **Pictures** come from Wikimedia Commons, the Met and the Cleveland Museum of Art. Each tile is marked with the largest size it stays sharp at.
 - **Words** come from Wikiquote. Search for a person, a book or film, or a theme. Short lines come first.
+- **Film or book** takes one title and gathers what there is for it under tabs: stills, its lines from Wikiquote (each credited to the character who says it, with a box to narrow them and the characters to pick between), longer passages, and short exchanges. A book with no page of its own is read off its author's page.
 
-- **Film or book** takes one title and gathers what there is for it: its lines from Wikiquote, each credited to the character who says it, short exchanges between characters, and pictures. A book with no page of its own is read off its author's page.
+Press a picture to see it large. From there the arrow keys move along and K keeps. The corner of a tile keeps it without opening it. Keeping is a switch: press again to take it back.
+
+On a film's page, a line can go over a still, set along the bottom like a subtitle: press **Put it on a still** under a line and pick the still, or open a still and type a word to find the line.
+
+Everything you keep gathers in a tray along the bottom of Find, which counts what's waiting and leads straight to printing it.
 
 Stills from a film come from [TMDB](https://www.themoviedb.org), which needs a free key: make an account, ask for an API key under Settings, and add it to `.env.local` as `TMDB_API_KEY`. Without one you get what Wikimedia Commons has, which is mostly films old enough to be out of copyright. Stills belong to the film's makers, so they're for your own wall and no further. This app uses the TMDB API but isn't endorsed or certified by TMDB.
 
@@ -142,7 +147,7 @@ Saved items wait under **Prints**, to be sorted.
 
 **Prints** holds photos and quotes to be printed. There are two ways to print them.
 
-**Print on paper** is for a home or library printer. Tick what you want, pick a size for each, and it downloads one PDF of A4 sheets with everything laid out at true size and a grey line round each to cut along. It fits as many to a sheet as it can: two A5s, or four postcards. Print at 100% ("actual size"), not "fit to page". A picture can be shown whole, at its own shape, or cropped to fill the size exactly. What you've printed is remembered on that device, so next time only the new things are ticked.
+**Print on paper** is for a home or library printer. Tick what you want, pick a size for each, and it downloads one PDF of A4 sheets with everything laid out at true size and a grey line round each to cut along. It fits as many to a sheet as it can: two A5s, or four postcards. Print at 100% ("actual size"), not "fit to page". A picture can be shown whole, at its own shape, or cropped to fill the size exactly. The sheets are drawn in small beside the list, so you can see the layout before downloading. Once they're printed, press **Printed: clear these** and they move under "Printed before", so next time only the new things are ticked.
 
 **Print list** is for ordering from a photo printer. It covers what you've placed on a wall, and downloads print-ready files in a folder per size. Once you mark them as ordered, later downloads hold only what's new. Things you already own never appear there.
 

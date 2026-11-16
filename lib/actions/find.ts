@@ -3,9 +3,27 @@
 import { z } from "zod";
 import { requireSession } from "../auth";
 import { captionImage } from "../content/caption";
-import { ingestImage, UnsupportedImageError } from "../content/media";
-import { addText, decide, describeFound, findText } from "../content/store";
-import { creditLine, downloadImage, KEEP_SOURCES, resolveImage } from "../find/images";
+import { ingestImage, removeMedia, UnsupportedImageError } from "../content/media";
+import {
+  addText,
+  alreadyKept,
+  decide,
+  deleteContent,
+  describeFound,
+  findText,
+  getContent,
+  placementCount,
+  setPrinted,
+} from "../content/store";
+import {
+  creditLine,
+  downloadImage,
+  KEEP_SOURCES,
+  refOf,
+  resolveImage,
+  searchImages,
+  type ImageSearch,
+} from "../find/images";
 import { pinSearch, unpinSearch } from "../find/interests";
 
 export type KeepResult = { ok: true; id: string; already: boolean } | { ok: false; error: string };
@@ -31,10 +49,14 @@ export async function keepImageAction(
   await requireSession();
   const ref = imageRef.safeParse({ source, id });
   if (!ref.success) return { ok: false, error: "That picture can't be saved." };
+  const line = caption.trim().slice(0, 300);
+  // A captioned still is a picture of its own, so only the plain one is looked up.
+  const foundRef = line ? null : refOf(ref.data.source, ref.data.id);
+  const before = foundRef ? alreadyKept([foundRef], [])[foundRef] : undefined;
+  if (before) return { ok: true, id: before, already: true };
   try {
     const image = await resolveImage(ref.data.source, ref.data.id);
     if (!image) return { ok: false, error: "The source no longer lists that picture." };
-    const line = caption.trim().slice(0, 300);
     const original = await downloadImage(image.downloadUrl);
     const bytes = line ? await captionImage(original, line) : original;
     const saved = await ingestImage(bytes, `${image.title.slice(0, 80)}.jpg`, "upload");
@@ -43,6 +65,7 @@ export async function keepImageAction(
         title: line ? `${image.title}: “${line.slice(0, 80)}”` : image.title,
         attribution: creditLine(image) || null,
         sourceUrl: image.pageUrl,
+        foundRef,
       });
       // You went looking for it, so it's kept from the start, not left to sort.
       decide(saved.id, "keep");
@@ -82,6 +105,37 @@ export async function keepQuoteAction(input: {
   });
   decide(id, "keep");
   return { ok: true, id, already: false };
+}
+
+/**
+ * Takes back a Keep made a moment ago. Only for things that came from Find and
+ * aren't on a wall: anything else is left for the library to delete.
+ */
+export async function unkeepAction(contentId: string): Promise<{ ok: boolean; error?: string }> {
+  await requireSession();
+  const id = z.uuid().safeParse(contentId);
+  const item = id.success ? getContent(id.data) : undefined;
+  if (!item) return { ok: true };
+  if (item.source !== "find") return { ok: false, error: "That was yours already. Remove it from Prints." };
+  if (placementCount(item.id) > 0) return { ok: false, error: "It's on a wall. Remove it from Prints." };
+  deleteContent(item.id);
+  if (item.kind === "photo") await removeMedia(item.id);
+  return { ok: true };
+}
+
+export type MoreImages = ImageSearch & { kept: Record<string, string> };
+
+/** The next page of a picture search, to add to the ones already showing. */
+export async function moreImagesAction(q: string, page: number): Promise<MoreImages> {
+  await requireSession();
+  const wanted = z.object({ q: z.string().trim().min(1).max(120), page: z.number().int().min(0).max(40) }).parse({ q, page });
+  const found = await searchImages(wanted.q, wanted.page);
+  return { ...found, kept: alreadyKept(found.results.map((i) => refOf(i.source, i.id)), []) };
+}
+
+export async function setPrintedAction(ids: string[], printed: boolean): Promise<void> {
+  await requireSession();
+  setPrinted(z.array(z.uuid()).max(200).parse(ids), printed);
 }
 
 const pin = z.object({

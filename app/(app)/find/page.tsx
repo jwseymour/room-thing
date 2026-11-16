@@ -1,12 +1,16 @@
-import Form from "next/form";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
-import { BusyHint, LineCard, PictureCard } from "@/components/find/Cards";
+import { BusyHint } from "@/components/find/Cards";
+import { FindBar } from "@/components/find/FindBar";
 import { KeepQuote, PinButton } from "@/components/find/KeepButtons";
+import { LineList } from "@/components/find/LineList";
+import { PictureGrid } from "@/components/find/PictureGrid";
+import { RandomPoint } from "@/components/find/RandomPoint";
 import { requireSession } from "@/lib/auth";
+import { alreadyKept } from "@/lib/content/store";
 import { hasContact } from "@/lib/find/http";
-import { searchImages } from "@/lib/find/images";
+import { refOf, searchImages } from "@/lib/find/images";
 import { isPinned, loadInterests, type SearchKind } from "@/lib/find/interests";
 import { searchQuotes } from "@/lib/find/quotes";
 
@@ -32,65 +36,23 @@ export default async function FindPage({ searchParams }: PageProps<"/find">) {
 
   return (
     <>
-      <h1 className="mb-2 text-2xl">Find</h1>
-      <p className="mb-4 max-w-xl text-sm text-muted">
-        Pictures and lines that are free to print, from Wikimedia Commons, the
-        Met, the Cleveland Museum of Art and Wikiquote. What you keep goes to{" "}
-        <Link href="/library?status=keep" className="text-ink underline underline-offset-4">
-          Prints
-        </Link>
-        .
-      </p>
-
-      <Form action="/find" className="mb-6 flex flex-wrap gap-2">
-        <input
-          name="q"
-          type="search"
-          defaultValue={q}
-          required
-          aria-label="Search for"
-          placeholder="An artist, a subject, a writer, a film"
-          className="field min-w-0 flex-1 basis-60"
-        />
-        {/* Radios, not two submit buttons: the form only sends its fields. */}
-        <div className="flex">
-          {(["pictures", "words", "work"] as const).map((option) => (
-            <label key={option} className="btn -ml-px cursor-pointer first:ml-0 has-checked:bg-ink has-checked:text-paper">
-              <input
-                type="radio"
-                name="kind"
-                value={option}
-                defaultChecked={kind === option}
-                className="sr-only"
-              />
-              {option === "pictures" ? "Pictures" : option === "words" ? "Words" : "Film or book"}
-            </label>
-          ))}
-        </div>
-        <button type="submit" className="btn btn-primary">
-          Search
-        </button>
-      </Form>
+      <h1 className="mb-3 text-2xl">Find</h1>
+      <FindBar q={q} kind={q ? kind : null} />
 
       {q ? (
         <>
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-lg">
-              {kind === "pictures" ? "Pictures" : "Words"}: {q}
-            </h2>
-            <div className="flex gap-2">
-              <PinButton q={q} kind={kind} pinned={isPinned(interests, q, kind)} />
-              <Link href="/find" className="btn btn-quiet">
-                Starting points
-              </Link>
-            </div>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+            <Link href="/find" className="text-sm text-muted">
+              ← Starting points
+            </Link>
+            <PinButton q={q} kind={kind} pinned={isPinned(interests, q, kind)} />
           </div>
           {/* Keyed, so a new search shows the waiting line again and not the old results. */}
           <Suspense
             key={`${kind}:${q}:${page}`}
             fallback={<p role="status" className="py-12 text-center text-muted">Searching…</p>}
           >
-            {kind === "pictures" ? <Pictures q={q} page={page} /> : <Words q={q} page={page} />}
+            {kind === "pictures" ? <Pictures q={q} /> : <Words q={q} page={page} />}
           </Suspense>
         </>
       ) : (
@@ -100,26 +62,9 @@ export default async function FindPage({ searchParams }: PageProps<"/find">) {
   );
 }
 
-function Pager({ q, kind, page, more }: { q: string; kind: SearchKind; page: number; more: boolean }) {
-  if (page === 0 && !more) return null;
-  return (
-    <div className="mt-6 flex justify-center gap-2">
-      {page > 0 && (
-        <Link href={href(q, kind, page - 1)} className="btn btn-quiet">
-          Back
-        </Link>
-      )}
-      {more && (
-        <Link href={href(q, kind, page + 1)} className="btn">
-          More
-        </Link>
-      )}
-    </div>
-  );
-}
-
-async function Pictures({ q, page }: { q: string; page: number }) {
-  const { results, failed, more } = await searchImages(q, page);
+async function Pictures({ q }: { q: string }) {
+  const { results, failed, more } = await searchImages(q, 0);
+  const kept = alreadyKept(results.map((image) => refOf(image.source, image.id)), []);
   return (
     <>
       {failed.length > 0 && (
@@ -133,15 +78,13 @@ async function Pictures({ q, page }: { q: string; page: number }) {
           Nothing found. Try fewer words, or a name on its own.
         </p>
       ) : (
-        <ul className="columns-2 gap-3 sm:columns-3 md:columns-4">
-          {results.map((image) => (
-            <li key={`${image.source}:${image.id}`} className="mb-3 break-inside-avoid border border-line bg-card">
-              <PictureCard image={image} />
-            </li>
-          ))}
-        </ul>
+        <>
+          <p className="mb-2 text-xs text-muted">
+            Press a picture to see it large. The corner keeps it for printing.
+          </p>
+          <PictureGrid images={results} kept={kept} moreOf={q} hasMore={more} />
+        </>
       )}
-      <Pager q={q} kind="pictures" page={page} more={more} />
     </>
   );
 }
@@ -155,97 +98,118 @@ async function Words({ q, page }: { q: string; page: number }) {
       </p>
     );
   }
+  if (results.length === 0) {
+    return (
+      <p className="py-12 text-center text-muted">
+        Nothing found. Wikiquote is sorted by person, work and theme, so try a
+        name, a title or one word.
+      </p>
+    );
+  }
   return (
     <>
       {pages.length > 0 && (
-        <p className="mb-3 text-sm text-muted">From Wikiquote&apos;s pages on {pages.join(" and ")}.</p>
+        <p className="mb-2 text-xs text-muted">From Wikiquote&apos;s pages on {pages.join(" and ")}.</p>
       )}
-      {results.length === 0 ? (
-        <p className="py-12 text-center text-muted">
-          Nothing found. Wikiquote is sorted by person, work and theme, so try a
-          name, a title or one word.
-        </p>
-      ) : (
-        <ul className="grid gap-3 sm:grid-cols-2">
-          {results.map((quote) => (
-            <li key={quote.body} className="border border-line bg-card p-4">
-              <LineCard quote={quote} />
-            </li>
-          ))}
-        </ul>
+      <LineList quotes={results} kept={alreadyKept([], results.map((quote) => quote.body))} />
+      {(page > 0 || more) && (
+        <div className="mt-4 flex gap-2">
+          {page > 0 && (
+            <Link href={href(q, "words", page - 1)} className="btn btn-quiet">
+              Back
+            </Link>
+          )}
+          {more && (
+            <Link href={href(q, "words", page + 1)} className="btn">
+              More
+            </Link>
+          )}
+        </div>
       )}
-      <Pager q={q} kind="words" page={page} more={more} />
     </>
   );
 }
 
-function Chip({ q, kind }: { q: string; kind: SearchKind }) {
+function Chips({ label, kind, list }: { label: string; kind: SearchKind; list: string[] }) {
+  if (list.length === 0) return null;
   return (
-    <Link
-      href={href(q, kind)}
-      className={`inline-flex min-h-10 items-center border px-3 text-sm ${
-        kind === "words" ? "border-line italic text-muted" : "border-ink"
-      }`}
-    >
-      {kind === "words" ? `“${q}”` : q}
-    </Link>
+    <div className="flex items-baseline gap-3">
+      <span className="eyebrow w-16 shrink-0">{label}</span>
+      <div className="flex flex-wrap gap-x-4 gap-y-1">
+        {list.map((q) => (
+          <Link key={q} href={href(q, kind)} className="py-1 underline decoration-line underline-offset-4 hover:decoration-ink">
+            {q}
+          </Link>
+        ))}
+      </div>
+    </div>
   );
 }
 
 function StartingPoints({ interests }: { interests: ReturnType<typeof loadInterests> }) {
+  const everything = [
+    ...interests.groups.flatMap((group) => [
+      ...group.pictures.map((q) => href(q, "pictures")),
+      ...group.words.map((q) => href(q, "words")),
+    ]),
+  ];
+  const pinnedOf = (kind: SearchKind) => interests.pinned.filter((p) => p.kind === kind).map((p) => p.q);
+
   return (
     <>
-      <p className="mb-5 max-w-xl text-sm text-muted">
-        {interests.personal
-          ? "Starting points drawn from what you make, do and write about. Outlined ones search for pictures, the ones in quotes for words."
-          : "Some places to start. Outlined ones search for pictures, the ones in quotes for words."}
-      </p>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <p className="max-w-xl text-sm text-muted">
+          Search for anything, or start from one of these
+          {interests.personal ? ", drawn from what you make, do and write about" : ""}. What you keep
+          gathers in a tray along the bottom, ready to print.
+        </p>
+        <RandomPoint hrefs={everything} />
+      </div>
 
-      {interests.pinned.length > 0 && (
-        <section className="mb-6">
-          <h2 className="eyebrow mb-2">Pinned</h2>
-          <div className="flex flex-wrap gap-2">
-            {interests.pinned.map((pin) => (
-              <Chip key={`${pin.kind}:${pin.q}`} q={pin.q} kind={pin.kind} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {interests.groups.map((group) => (
-        <section key={group.name} className="mb-6">
-          <h2 className="eyebrow">{group.name}</h2>
-          {group.why && <p className="mt-1 max-w-xl text-sm text-muted">{group.why}</p>}
-          <div className="mt-2 flex flex-wrap gap-2">
-            {group.pictures.map((q) => (
-              <Chip key={`p:${q}`} q={q} kind="pictures" />
-            ))}
-            {group.words.map((q) => (
-              <Chip key={`w:${q}`} q={q} kind="words" />
-            ))}
-          </div>
-        </section>
-      ))}
+      <div className="border-b border-line">
+        {interests.pinned.length > 0 && (
+          <section className="grid gap-x-6 gap-y-2 border-t border-ink py-4 sm:grid-cols-[13rem_1fr]">
+            <h2 className="text-sm tracking-[0.14em]">Pinned</h2>
+            <div className="grid gap-1.5 text-sm">
+              <Chips label="Pictures" kind="pictures" list={pinnedOf("pictures")} />
+              <Chips label="Words" kind="words" list={pinnedOf("words")} />
+            </div>
+          </section>
+        )}
+        {interests.groups.map((group) => (
+          <section key={group.name} className="grid gap-x-6 gap-y-2 border-t border-line py-4 sm:grid-cols-[13rem_1fr]">
+            <div>
+              <h2 className="text-sm tracking-[0.14em]">{group.name}</h2>
+              {group.why && <p className="mt-1 text-xs text-muted">{group.why}</p>}
+            </div>
+            <div className="grid content-start gap-1.5 text-sm">
+              <Chips label="Pictures" kind="pictures" list={group.pictures} />
+              <Chips label="Words" kind="words" list={group.words} />
+            </div>
+          </section>
+        ))}
+      </div>
 
       {interests.ownWords.length > 0 && (
-        <section className="mb-6">
-          <h2 className="eyebrow">In your own words</h2>
-          <p className="mt-1 max-w-xl text-sm text-muted">
+        <section className="mt-8">
+          <h2 className="text-sm tracking-[0.14em]">In your own words</h2>
+          <p className="mt-1 mb-2 text-xs text-muted">
             Lines from your own notes that would work as reminders.
           </p>
-          <ul className="mt-2 grid gap-3 sm:grid-cols-2">
+          <ul className="max-w-3xl border-b border-line">
             {interests.ownWords.map((line) => (
-              <li key={line.body} className="border border-line bg-card p-4">
-                <blockquote className="text-lg leading-snug">{line.body}</blockquote>
-                {line.attribution && <p className="mt-2 text-sm">{line.attribution}</p>}
-                <div className="mt-3">
-                  <KeepQuote
-                    body={line.body}
-                    attribution={line.attribution ?? ""}
-                    kind={line.kind}
-                    sourceUrl={null}
-                  />
+              <li key={line.body} className="flex flex-wrap items-start gap-x-4 gap-y-2 border-t border-line py-3 sm:flex-nowrap">
+                <div className="min-w-0 flex-1 basis-full sm:basis-auto">
+                  <blockquote className="text-[1.05rem] leading-snug">{line.body}</blockquote>
+                  {line.attribution && <p className="mt-1 text-xs">{line.attribution}</p>}
                 </div>
+                <KeepQuote
+                  body={line.body}
+                  attribution={line.attribution ?? ""}
+                  kind={line.kind}
+                  sourceUrl={null}
+                  keptId={alreadyKept([], [line.body])[line.body]}
+                />
               </li>
             ))}
           </ul>

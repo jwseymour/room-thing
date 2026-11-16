@@ -72,6 +72,10 @@ export const content = sqliteTable(
     title: text("title"),
     /** Where a found picture or quote came from, to go back to it. */
     sourceUrl: text("source_url"),
+    /** Which found picture this is, as `<source>:<id>`, so a search can show it's kept. */
+    foundRef: text("found_ref"),
+    /** When it was last printed on paper. Until then it waits in the tray. */
+    printedAt: integer("printed_at", { mode: "timestamp_ms" }),
     /** A thing's real size, once it's been measured or matched to a paper size. */
     widthMm: integer("width_mm"),
     heightMm: integer("height_mm"),

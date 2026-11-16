@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, count, desc, eq, inArray, ne } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNull, ne } from "drizzle-orm";
 import { getDb } from "../db";
 import {
   content,
@@ -95,12 +95,54 @@ export function findText(body: string): ContentItem | undefined {
 /** Records what a found picture is and where it came from. */
 export function describeFound(
   id: string,
-  details: { title: string; attribution: string | null; sourceUrl: string },
+  details: { title: string; attribution: string | null; sourceUrl: string; foundRef?: string | null },
 ): void {
   getDb()
     .update(content)
     .set({ ...details, source: "find" })
     .where(eq(content.id, id))
+    .run();
+}
+
+/** Which of these found pictures and lines are in the library already, and under what id. */
+export function alreadyKept(refs: string[], bodies: string[]): Record<string, string> {
+  const db = getDb();
+  const found: Record<string, string> = {};
+  if (refs.length) {
+    const rows = db
+      .select({ id: content.id, ref: content.foundRef })
+      .from(content)
+      .where(inArray(content.foundRef, refs))
+      .all();
+    for (const row of rows) if (row.ref) found[row.ref] = row.id;
+  }
+  if (bodies.length) {
+    const rows = db
+      .select({ id: content.id, body: content.body })
+      .from(content)
+      .where(and(inArray(content.body, bodies), inArray(content.kind, ["quote", "reminder"])))
+      .all();
+    for (const row of rows) if (row.body) found[row.body] = row.id;
+  }
+  return found;
+}
+
+/** Kept and not printed yet: what's waiting to go on paper. */
+export function listTray(): ContentItem[] {
+  return getDb()
+    .select()
+    .from(content)
+    .where(and(eq(content.status, "keep"), ne(content.kind, "thing"), isNull(content.printedAt)))
+    .orderBy(desc(content.decidedAt))
+    .all();
+}
+
+export function setPrinted(ids: string[], printed: boolean): void {
+  if (ids.length === 0) return;
+  getDb()
+    .update(content)
+    .set({ printedAt: printed ? new Date() : null })
+    .where(inArray(content.id, ids))
     .run();
 }
 

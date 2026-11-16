@@ -7,32 +7,8 @@
 import { getJson, request } from "./http";
 import { resolveTmdb } from "./tmdb";
 
-export const IMAGE_SOURCES = ["commons", "met", "cleveland"] as const;
-/** Sources a picture can be kept from: the three searched, and stills from TMDB. */
-export const KEEP_SOURCES = [...IMAGE_SOURCES, "tmdb"] as const;
-export type ImageSource = (typeof KEEP_SOURCES)[number];
-
-export const SOURCE_NAMES: Record<ImageSource, string> = {
-  tmdb: "TMDB",
-  commons: "Wikimedia Commons",
-  met: "The Met",
-  cleveland: "Cleveland Museum of Art",
-};
-
-export type FoundImage = {
-  source: ImageSource;
-  /** What the source calls it: a file title on Commons, an object number elsewhere. */
-  id: string;
-  title: string;
-  creator: string | null;
-  date: string | null;
-  licence: string | null;
-  thumbUrl: string;
-  pageUrl: string;
-  /** Size of the file that would be saved, where the source says. */
-  widthPx: number | null;
-  heightPx: number | null;
-};
+export * from "./picture";
+import { SOURCE_NAMES, IMAGE_SOURCES, type FoundImage, type ImageSource } from "./picture";
 
 export type ResolvedImage = FoundImage & { downloadUrl: string };
 
@@ -363,10 +339,4 @@ export async function downloadImage(url: string): Promise<Buffer> {
   const bytes = Buffer.from(await response.arrayBuffer());
   if (bytes.length > MAX_DOWNLOAD_BYTES) throw new Error("That file is too large.");
   return bytes;
-}
-
-/** "Hiroshige, c. 1837 · The Met · Public domain": one line to show under a picture. */
-export function creditLine(image: Pick<FoundImage, "creator" | "date" | "source" | "licence">): string {
-  const who = [image.creator, image.date].filter(Boolean).join(", ");
-  return [who, SOURCE_NAMES[image.source], image.licence].filter(Boolean).join(" · ");
 }

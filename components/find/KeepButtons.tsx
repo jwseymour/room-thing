@@ -1,44 +1,69 @@
 "use client";
 
-import Link from "next/link";
 import { useState, useTransition } from "react";
-import { keepImageAction, keepQuoteAction, setPinnedAction, type KeepResult } from "@/lib/actions/find";
+import {
+  keepImageAction,
+  keepQuoteAction,
+  setPinnedAction,
+  unkeepAction,
+  type KeepResult,
+} from "@/lib/actions/find";
+import { useTray } from "./Tray";
 
-function useKeep(save: () => Promise<KeepResult>) {
-  const [result, setResult] = useState<KeepResult | null>(null);
+/**
+ * Keeping as a switch: once to keep, again to take it back. `keptId` is the
+ * library's id for it, if it's kept already.
+ */
+export function useKeep(save: () => Promise<KeepResult>, keptId: string | null = null) {
+  const [id, setId] = useState(keptId);
+  const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const keep = () =>
+  const { refresh } = useTray();
+
+  const toggle = () =>
     startTransition(async () => {
+      setError(null);
       try {
-        setResult(await save());
+        if (id) {
+          const undone = await unkeepAction(id);
+          if (undone.ok) setId(null);
+          else setError(undone.error ?? "Couldn't take that back.");
+        } else {
+          const result = await save();
+          if (result.ok) setId(result.id);
+          else setError(result.error);
+        }
+        refresh();
       } catch {
-        setResult({ ok: false, error: "Couldn't save that. Is the laptop still running?" });
+        setError("Couldn't save that. Is the laptop still running?");
       }
     });
-  return { result, pending, keep };
+  return { id, kept: id !== null, pending, error, toggle };
 }
 
-function KeepState({
-  result,
+/** The switch as a button with words on it. */
+export function KeepSwitch({
+  kept,
   pending,
-  keep,
-  busyLabel,
-}: ReturnType<typeof useKeep> & { busyLabel: string }) {
-  if (result?.ok) {
-    return (
-      <Link href={`/library/${result.id}`} className="btn btn-quiet">
-        {result.already ? "Already kept" : "Kept"} ✓
-      </Link>
-    );
-  }
+  error,
+  toggle,
+  busyLabel = "Saving",
+}: ReturnType<typeof useKeep> & { busyLabel?: string }) {
   return (
     <>
-      <button type="button" disabled={pending} onClick={keep} className="btn btn-primary">
-        {pending ? busyLabel : "Keep"}
+      <button
+        type="button"
+        disabled={pending}
+        aria-pressed={kept}
+        onClick={toggle}
+        title={kept ? "Kept. Press to take it back." : undefined}
+        className={`btn shrink-0 ${kept ? "btn-quiet" : "btn-primary"}`}
+      >
+        {pending ? busyLabel : kept ? "Kept ✓" : "Keep"}
       </button>
-      {result && !result.ok && (
+      {error && (
         <p role="alert" className="w-full text-xs text-danger">
-          {result.error}
+          {error}
         </p>
       )}
     </>
@@ -47,17 +72,21 @@ function KeepState({
 
 export function KeepImage({ source, id, caption }: { source: string; id: string; caption?: string }) {
   const state = useKeep(() => keepImageAction(source, id, caption));
-  return <KeepState {...state} busyLabel="Fetching" />;
+  return <KeepSwitch {...state} busyLabel="Fetching" />;
 }
 
-export function KeepQuote(props: {
+export function KeepQuote({
+  keptId,
+  ...quote
+}: {
   body: string;
   attribution: string;
   kind: "quote" | "reminder";
   sourceUrl: string | null;
+  keptId?: string | null;
 }) {
-  const state = useKeep(() => keepQuoteAction(props));
-  return <KeepState {...state} busyLabel="Saving" />;
+  const state = useKeep(() => keepQuoteAction(quote), keptId ?? null);
+  return <KeepSwitch {...state} />;
 }
 
 export function PinButton({ q, kind, pinned }: { q: string; kind: string; pinned: boolean }) {
@@ -74,9 +103,9 @@ export function PinButton({ q, kind, pinned }: { q: string; kind: string; pinned
           setIsPinned(!isPinned);
         })
       }
-      className="btn btn-quiet"
+      className="text-sm text-muted underline underline-offset-4"
     >
-      {isPinned ? "Pinned ✓" : "Pin this search"}
+      {isPinned ? "Pinned to your starting points ✓" : "Pin this search"}
     </button>
   );
 }

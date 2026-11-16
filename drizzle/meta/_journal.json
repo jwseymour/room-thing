@@ -36,6 +36,13 @@
       "when": 1794761135765,
       "tag": "0004_fuzzy_meteorite",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1794846223681,
+      "tag": "0005_swift_skaar",
+      "breakpoints": true
     }
   ]
 }

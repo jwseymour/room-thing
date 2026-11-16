@@ -14,9 +14,17 @@ const { content, roomVersions, signals } = await import("./db/schema");
 const { ingestImage, variantPath, UnsupportedImageError } = await import(
   "./content/media"
 );
-const { addText, decide, inboxBatch, statusCounts, undoDecision } = await import(
-  "./content/store"
-);
+const {
+  addText,
+  alreadyKept,
+  decide,
+  describeFound,
+  inboxBatch,
+  listTray,
+  setPrinted,
+  statusCounts,
+  undoDecision,
+} = await import("./content/store");
 const {
   activePlacements,
   addPlacement,
@@ -195,6 +203,40 @@ describe("sorting", () => {
       .all()
       .map((s) => s.type);
     expect(types).toEqual(["placed"]);
+  });
+});
+
+describe("the tray of things to print", () => {
+  it("holds what's kept until it's printed", () => {
+    const kept = addText({ kind: "quote", body: "Kept for the tray.", attribution: null, source: "find" });
+    const unsure = addText({ kind: "quote", body: "Only a maybe.", attribution: null, source: "find" });
+    decide(kept, "keep");
+    decide(unsure, "maybe");
+    const inTray = () => listTray().map((item) => item.id);
+    expect(inTray()).toContain(kept);
+    expect(inTray()).not.toContain(unsure);
+
+    setPrinted([kept], true);
+    expect(inTray()).not.toContain(kept);
+    setPrinted([kept], false);
+    expect(inTray()).toContain(kept);
+  });
+
+  it("knows a found picture or line when it sees it again", async () => {
+    const saved = await ingestImage(await photo("#445566"), "found.jpg", "upload");
+    describeFound(saved.id, {
+      title: "Found",
+      attribution: null,
+      sourceUrl: "https://example.org/found",
+      foundRef: "commons:File:Found.jpg",
+    });
+    const line = addText({ kind: "quote", body: "Seen before.", attribution: null, source: "find" });
+
+    expect(alreadyKept(["commons:File:Found.jpg", "met:1"], ["Seen before.", "Never seen."])).toEqual({
+      "commons:File:Found.jpg": saved.id,
+      "Seen before.": line,
+    });
+    expect(alreadyKept([], [])).toEqual({});
   });
 });
 

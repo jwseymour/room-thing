@@ -29,6 +29,7 @@ export default async function PaperPage() {
       heightPx: item.heightPx,
       sizeId: onPaper(planned.get(item.id)) ?? fallback,
       sharpLongMm: sharp?.longMm ?? null,
+      printed: item.printedAt !== null,
     };
   });
 
@@ -47,16 +48,16 @@ export default async function PaperPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl">
-      <Link href="/library" className="text-sm text-muted">
-        ← Prints
-      </Link>
+    <div>
+      <div className="flex flex-wrap gap-x-4 text-sm text-muted">
+        <Link href="/find">← Find more</Link>
+        <Link href="/library?status=keep">Everything kept</Link>
+      </div>
       <h1 className="mt-2 text-2xl">Print on paper</h1>
-      <p className="mt-1 mb-4 text-sm text-muted">
-        Everything you&apos;ve kept, laid out on sheets of A4 to print in colour
-        and cut out along the grey lines. Print at 100%, or &ldquo;actual
-        size&rdquo;, so the sizes come out true. Most printers leave a few
-        millimetres blank round the edge of the sheet.
+      <p className="mt-1 mb-4 max-w-2xl text-sm text-muted">
+        What you&apos;ve kept and not printed yet, laid out on sheets of A4 to
+        print in colour and cut out. Most printers leave a few millimetres
+        blank round the edge of the sheet.
       </p>
       <PaperPrint items={items} />
     </div>

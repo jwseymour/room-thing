@@ -55,8 +55,7 @@ export function Assistant({ page, q, title, onScreen }: { page: string; q: strin
   }
 
   return (
-    <section className="mb-8 border border-ink p-4">
-      <h3 className="eyebrow mb-2">Ask Claude</h3>
+    <section className="max-w-3xl">
       <p className="mb-3 max-w-xl text-sm text-muted">
         Say what you&apos;re after from {title}. Claude reads what&apos;s on this page
         {onScreen ? ", looks at the stills," : ""} and searches the web for more. It takes
@@ -88,7 +87,7 @@ export function Assistant({ page, q, title, onScreen }: { page: string; q: strin
             type="button"
             disabled={busy}
             onClick={() => void send(idea)}
-            className="inline-flex min-h-10 items-center border border-line px-3 text-sm text-muted"
+            className="inline-flex min-h-10 items-center border border-line px-3 text-sm"
           >
             {idea}
           </button>
